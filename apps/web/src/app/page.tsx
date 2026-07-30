@@ -12,7 +12,7 @@ export default function HomePage() {
     if (loading) {
       return;
     }
-    router.replace(session ? "/dashboard" : "/login");
+    router.replace(session ? "/inbox" : "/login");
   }, [loading, session, router]);
 
   return null;

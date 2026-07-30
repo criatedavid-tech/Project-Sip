@@ -48,6 +48,42 @@ async function extractMessage(response: Response): Promise<string> {
   }
 }
 
+export interface ConversationListItem {
+  id: string;
+  status: string;
+  contactId: string;
+  contactName: string | null;
+  contactIdentifier: string | null;
+  lastMessageAt: string | null;
+  lastInboundAt: string | null;
+  withinServiceWindow: boolean;
+  unreadCount: number;
+  lastMessagePreview: string | null;
+}
+
+export interface Message {
+  id: string;
+  direction: "inbound" | "outbound";
+  senderType: string;
+  contentType: string;
+  body: string | null;
+  status: string;
+  errorMessage: string | null;
+  createdAt: string;
+  deliveredAt: string | null;
+  readAt: string | null;
+}
+
+export interface ThreadResponse {
+  conversation: {
+    id: string;
+    status: string;
+    lastInboundAt: string | null;
+    withinServiceWindow: boolean;
+  };
+  messages: Message[];
+}
+
 export const api = {
   login(email: string, password: string): Promise<LoginResponse> {
     return request<LoginResponse>("/auth/login", {
@@ -75,4 +111,37 @@ export const api = {
       headers: { authorization: `Bearer ${accessToken}` },
     });
   },
+
+  conversations(accessToken: string): Promise<ConversationListItem[]> {
+    return request("/conversations", { headers: auth(accessToken) });
+  },
+
+  thread(accessToken: string, conversationId: string): Promise<ThreadResponse> {
+    return request(`/conversations/${conversationId}/messages`, {
+      headers: auth(accessToken),
+    });
+  },
+
+  sendMessage(
+    accessToken: string,
+    conversationId: string,
+    body: string,
+  ): Promise<Message> {
+    return request(`/conversations/${conversationId}/messages`, {
+      method: "POST",
+      headers: auth(accessToken),
+      body: JSON.stringify({ body }),
+    });
+  },
+
+  markRead(accessToken: string, conversationId: string): Promise<{ ok: boolean }> {
+    return request(`/conversations/${conversationId}/read`, {
+      method: "POST",
+      headers: auth(accessToken),
+    });
+  },
 };
+
+function auth(accessToken: string): Record<string, string> {
+  return { authorization: `Bearer ${accessToken}` };
+}

@@ -16,7 +16,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!loading && session) {
-      router.replace("/dashboard");
+      router.replace("/inbox");
     }
   }, [loading, session, router]);
 
@@ -27,7 +27,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
-      router.replace("/dashboard");
+      router.replace("/inbox");
     } catch (caught) {
       // A API responde igual para senha errada e e-mail inexistente; a
       // interface preserva isso e não sugere qual dos dois falhou.
