@@ -1,0 +1,11 @@
+{
+  "extends": "@omni/tsconfig/nestjs.json",
+  "compilerOptions": {
+    "baseUrl": "./",
+    "incremental": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
