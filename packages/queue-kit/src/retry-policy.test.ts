@@ -1,12 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RETRY_POLICY, buildJobOptions, hasExhaustedAttempts } from "./retry-policy";
+import {
+  DEFAULT_RETRY_POLICY,
+  buildJobOptions,
+  hasExhaustedAttempts,
+  sanitizeJobId,
+} from "./retry-policy";
 import { deadLetterQueueName } from "./queue-names";
+
+describe("sanitizeJobId", () => {
+  it("troca ':' por '-', caractere que o BullMQ recusa em jobId", () => {
+    expect(sanitizeJobId("upload:rec-1")).toBe("upload-rec-1");
+    expect(sanitizeJobId("transcribe:rec-1:mock")).toBe("transcribe-rec-1-mock");
+  });
+
+  it("deixa intacto um id que já é válido", () => {
+    expect(sanitizeJobId("upload-rec-1")).toBe("upload-rec-1");
+  });
+});
 
 describe("buildJobOptions", () => {
   it("usa o jobId como chave de idempotência e aplica backoff exponencial", () => {
     const options = buildJobOptions(DEFAULT_RETRY_POLICY, "upload:rec-1");
 
-    expect(options.jobId).toBe("upload:rec-1");
+    // Sanitizado: com ":" o BullMQ descartaria o job silenciosamente.
+    expect(options.jobId).toBe("upload-rec-1");
     expect(options.attempts).toBe(5);
     expect(options.backoff).toEqual({ type: "exponential", delay: 5000 });
   });

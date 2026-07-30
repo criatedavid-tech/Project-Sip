@@ -5,6 +5,7 @@ import {
   DEFAULT_RETRY_POLICY,
   buildJobOptions,
   hasExhaustedAttempts,
+  sanitizeJobId,
   type RetryPolicy,
 } from "./retry-policy";
 
@@ -102,7 +103,7 @@ export function defineQueue<TPayload>(
         }
 
         void addJob(deadLetterQueue, deadLetterQueueName(name), job.data, {
-          jobId: `dlq:${job.id}`,
+          jobId: sanitizeJobId(`dlq-${job.id}`),
           removeOnComplete: false,
           removeOnFail: false,
         }).catch((dlqError: unknown) => {

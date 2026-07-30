@@ -15,13 +15,23 @@ export const DEFAULT_RETRY_POLICY: RetryPolicy = {
   keepFailed: 500,
 };
 
+/**
+ * O BullMQ usa ":" como separador de chaves no Redis e recusa jobId que o
+ * contenha — silenciosamente, dentro de uma promise. Como a convenção natural
+ * das nossas chaves de idempotência é "upload:rec-1", normalizamos aqui em vez
+ * de exigir que cada chamador lembre da restrição.
+ */
+export function sanitizeJobId(jobId: string): string {
+  return jobId.replace(/:/g, "-");
+}
+
 export function buildJobOptions(
   policy: RetryPolicy,
   jobId: string,
   overrides: JobsOptions = {},
 ): JobsOptions {
   return {
-    jobId,
+    jobId: sanitizeJobId(jobId),
     attempts: policy.attempts,
     backoff: { type: "exponential", delay: policy.backoffDelayMs },
     removeOnComplete: policy.keepCompleted,
