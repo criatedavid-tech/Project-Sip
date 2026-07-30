@@ -38,6 +38,15 @@ importers:
       '@omni/observability':
         specifier: workspace:*
         version: link:../../packages/observability
+      '@omni/provider-contracts':
+        specifier: workspace:*
+        version: link:../../packages/provider-contracts
+      '@omni/queue-kit':
+        specifier: workspace:*
+        version: link:../../packages/queue-kit
+      '@omni/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7

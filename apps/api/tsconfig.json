@@ -4,7 +4,11 @@
     "baseUrl": "./",
     "incremental": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    // App não é consumido como biblioteca; emitir .d.ts só força anotar tipos
+    // inferidos grandes (como os schemas zod) sem benefício algum.
+    "declaration": false,
+    "declarationMap": false
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]

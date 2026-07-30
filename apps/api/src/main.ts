@@ -11,7 +11,9 @@ async function bootstrap(): Promise<void> {
   assertProductionSecrets(env);
 
   const logger = createLogger({ service: "api", level: env.LOG_LEVEL });
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // rawBody é indispensável para validar a assinatura HMAC da Meta: ela assina
+  // os bytes exatos do corpo, e reserializar o JSON invalida a comparação.
+  const app = await NestFactory.create(AppModule, { bufferLogs: true, rawBody: true });
 
   app.use(helmet());
   app.use(cookieParser());

@@ -36,6 +36,13 @@
       "when": 1785446850437,
       "tag": "0004_rls_whatsapp_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785446850438,
+      "tag": "0005_whatsapp_routing_view",
+      "breakpoints": true
     }
   ]
 }
