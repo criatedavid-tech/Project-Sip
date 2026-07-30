@@ -46,3 +46,20 @@ export async function withOrganization<T>(
     return fn(tx);
   });
 }
+
+/**
+ * Usado no login, quando o tenant ainda é desconhecido: identifica o usuário
+ * para que ele possa ler apenas os próprios vínculos e descobrir a quais
+ * organizações pertence. Não substitui withOrganization no acesso a dado de
+ * negócio.
+ */
+export async function withUser<T>(
+  db: Database,
+  userId: string,
+  fn: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('app.current_user_id', ${userId}, true)`);
+    return fn(tx);
+  });
+}

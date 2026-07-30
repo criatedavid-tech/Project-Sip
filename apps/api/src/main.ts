@@ -1,14 +1,28 @@
 import "reflect-metadata";
+import cookieParser from "cookie-parser";
+import helmet from "helmet";
 import { NestFactory } from "@nestjs/core";
+import { loadEnv, assertProductionSecrets } from "@omni/config";
+import { createLogger } from "@omni/observability";
 import { AppModule } from "./app.module";
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.enableCors();
-  const port = process.env.PORT ? Number(process.env.PORT) : 3001;
-  await app.listen(port);
-  // eslint-disable-next-line no-console
-  console.log(`api listening on :${port}`);
+async function bootstrap(): Promise<void> {
+  const env = loadEnv();
+  assertProductionSecrets(env);
+
+  const logger = createLogger({ service: "api", level: env.LOG_LEVEL });
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  app.use(helmet());
+  app.use(cookieParser());
+  app.enableCors({ origin: env.WEB_BASE_URL, credentials: true });
+  app.enableShutdownHooks();
+
+  await app.listen(env.API_PORT);
+  logger.info({ port: env.API_PORT }, "api iniciada");
 }
 
-bootstrap();
+bootstrap().catch((error: unknown) => {
+  createLogger({ service: "api" }).fatal({ err: error }, "falha ao iniciar a api");
+  process.exit(1);
+});
