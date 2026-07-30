@@ -1,8 +1,19 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "@/components/session-provider";
+
 export default function HomePage() {
-  return (
-    <main>
-      <h1>Omni Platform</h1>
-      <p>Fundação do monorepo em andamento.</p>
-    </main>
-  );
+  const { session, loading } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+    router.replace(session ? "/dashboard" : "/login");
+  }, [loading, session, router]);
+
+  return null;
 }
