@@ -3,6 +3,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Post,
   Req,
   Res,
@@ -27,7 +29,9 @@ const REFRESH_COOKIE = "omni_refresh";
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  // Autenticar não cria recurso: 200, não o 201 que o Nest usa por padrão.
   @Public()
+  @HttpCode(HttpStatus.OK)
   @Post("login")
   async login(
     @Body() body: unknown,
@@ -49,6 +53,7 @@ export class AuthController {
   }
 
   @Public()
+  @HttpCode(HttpStatus.OK)
   @Post("refresh")
   async refresh(
     @Req() request: Request,
@@ -72,6 +77,7 @@ export class AuthController {
   }
 
   @Public()
+  @HttpCode(HttpStatus.OK)
   @Post("logout")
   logout(@Res({ passthrough: true }) response: Response) {
     response.clearCookie(REFRESH_COOKIE, { path: "/auth" });

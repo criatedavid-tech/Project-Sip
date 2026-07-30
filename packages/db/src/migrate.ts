@@ -3,9 +3,11 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { createDatabase } from "./client";
 
 async function main(): Promise<void> {
-  const connectionString = process.env.DATABASE_URL;
+  // Migração cria e altera tabelas, o que a role restrita da aplicação não pode
+  // (e não deve poder) fazer.
+  const connectionString = process.env.DATABASE_ADMIN_URL;
   if (!connectionString) {
-    throw new Error("DATABASE_URL não definida");
+    throw new Error("DATABASE_ADMIN_URL não definida");
   }
 
   const { db, close } = createDatabase({ connectionString, maxConnections: 1 });

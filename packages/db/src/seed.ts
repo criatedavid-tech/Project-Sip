@@ -63,9 +63,11 @@ export async function seedRolesAndPermissions(connectionString: string): Promise
 }
 
 if (require.main === module) {
-  const connectionString = process.env.DATABASE_URL;
+  // Catálogo do produto (perfis e permissões), não dado de tenant: roda pela
+  // conexão administrativa junto das migrações.
+  const connectionString = process.env.DATABASE_ADMIN_URL;
   if (!connectionString) {
-    throw new Error("DATABASE_URL não definida");
+    throw new Error("DATABASE_ADMIN_URL não definida");
   }
   seedRolesAndPermissions(connectionString)
     .then(() => {

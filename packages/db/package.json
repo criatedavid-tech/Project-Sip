@@ -17,7 +17,9 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/migrate.ts",
-    "db:seed": "tsx src/seed.ts"
+    "db:seed": "tsx src/seed.ts",
+    "db:bootstrap-role": "tsx src/bootstrap-app-role.ts",
+    "db:setup": "pnpm db:migrate && pnpm db:bootstrap-role && pnpm db:seed"
   },
   "dependencies": {
     "@omni/auth": "workspace:*",
