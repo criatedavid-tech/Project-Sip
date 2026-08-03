@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  Inject,
   Injectable,
   SetMetadata,
   UnauthorizedException,
@@ -15,8 +16,8 @@ export const Public = () => SetMetadata(IS_PUBLIC, true);
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
-    private readonly tokens: TokenIssuer,
-    private readonly reflector: Reflector,
+    @Inject(TokenIssuer) private readonly tokens: TokenIssuer,
+    @Inject(Reflector) private readonly reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

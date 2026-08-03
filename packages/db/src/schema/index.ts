@@ -5,3 +5,4 @@ export * from "./contacts";
 export * from "./channels";
 export * from "./conversations";
 export * from "./webhooks";
+export * from "./telephony";

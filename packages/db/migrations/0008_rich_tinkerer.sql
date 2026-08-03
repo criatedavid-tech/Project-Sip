@@ -1,0 +1,1 @@
+ALTER TABLE "voice_calls" ADD COLUMN "provider" text DEFAULT 'unknown' NOT NULL;

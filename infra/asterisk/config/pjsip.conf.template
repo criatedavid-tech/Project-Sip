@@ -1,0 +1,118 @@
+[global]
+type = global
+user_agent = Omni Platform
+endpoint_identifier_order = ip,username,anonymous
+keep_alive_interval = 30
+
+[transport-udp]
+type = transport
+protocol = udp
+bind = 0.0.0.0:5060
+local_net = 10.0.0.0/8
+local_net = 172.16.0.0/12
+local_net = 192.168.0.0/16
+external_signaling_address = ${ASTERISK_EXTERNAL_ADDRESS}
+external_media_address = ${ASTERISK_EXTERNAL_ADDRESS}
+allow_reload = no
+
+[transport-ws]
+type = transport
+protocol = ws
+bind = 0.0.0.0
+
+; Tronco DirectCall. As credenciais entram apenas no container em runtime.
+[directcall-registration]
+type = registration
+transport = transport-udp
+outbound_auth = directcall-auth
+server_uri = sip:${SIP_TRUNK_HOST}:5060
+client_uri = sip:${SIP_USERNAME}@${SIP_TRUNK_HOST}:5060
+contact_user = ${SIP_USERNAME}
+retry_interval = 60
+forbidden_retry_interval = 300
+expiration = 300
+line = yes
+endpoint = directcall
+
+[directcall-auth]
+type = auth
+auth_type = userpass
+username = ${SIP_USERNAME}
+password = ${SIP_PASSWORD}
+
+[directcall-aor]
+type = aor
+contact = sip:${SIP_TRUNK_HOST}:5060
+qualify_frequency = 30
+
+[directcall]
+type = endpoint
+transport = transport-udp
+context = from-directcall
+disallow = all
+allow = ${SIP_SUPPORTED_CODECS}
+outbound_auth = directcall-auth
+aors = directcall-aor
+direct_media = no
+from_domain = ${SIP_TRUNK_HOST}
+from_user = ${SIP_USERNAME}
+dtmf_mode = rfc4733
+force_rport = yes
+rewrite_contact = yes
+rtp_symmetric = yes
+
+; Restringe chamadas recebidas aos servidores publicados pela DirectCall.
+[directcall-identify]
+type = identify
+endpoint = directcall
+match = 189.84.133.111
+match = 189.84.133.135
+match = 189.84.133.169
+match = 189.84.129.12
+
+; Tronco WaVoIP para chamadas de voz do WhatsApp. A opção line relaciona
+; chamadas recebidas ao endpoint sem depender de um IP fixo do provedor.
+[wavoip-registration]
+type = registration
+transport = transport-udp
+outbound_auth = wavoip-auth
+server_uri = sip:${WAVOIP_SIP_HOST}:${WAVOIP_SIP_PORT}
+client_uri = sip:${WAVOIP_SIP_USERNAME}@${WAVOIP_SIP_HOST}:${WAVOIP_SIP_PORT}
+contact_user = ${WAVOIP_SIP_USERNAME}
+retry_interval = 60
+forbidden_retry_interval = 300
+expiration = 300
+line = yes
+endpoint = wavoip
+
+[wavoip-auth]
+type = auth
+auth_type = userpass
+username = ${WAVOIP_SIP_USERNAME}
+password = ${WAVOIP_SIP_PASSWORD}
+
+[wavoip-aor]
+type = aor
+contact = sip:${WAVOIP_SIP_HOST}:${WAVOIP_SIP_PORT}
+qualify_frequency = 30
+
+[wavoip]
+type = endpoint
+transport = transport-udp
+context = from-wavoip
+disallow = all
+allow = ${WAVOIP_SUPPORTED_CODECS}
+outbound_auth = wavoip-auth
+aors = wavoip-aor
+direct_media = no
+from_domain = ${WAVOIP_SIP_HOST}
+from_user = ${WAVOIP_SIP_USERNAME}
+callerid = ${WAVOIP_CALLER_ID}
+dtmf_mode = rfc4733
+force_rport = yes
+rewrite_contact = yes
+rtp_symmetric = yes
+
+; Os ramais WebRTC são acrescentados pelo entrypoint a partir da faixa
+; ASTERISK_EXTENSION_START..ASTERISK_EXTENSION_END. O cadastro na aplicação
+; decide quais credenciais são entregues aos colaboradores.

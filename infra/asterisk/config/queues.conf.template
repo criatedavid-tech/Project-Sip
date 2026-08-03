@@ -1,0 +1,19 @@
+[general]
+persistentmembers = no
+autofill = yes
+
+[${ASTERISK_QUEUE_NAME}]
+strategy = ${ASTERISK_QUEUE_STRATEGY}
+timeout = ${ASTERISK_QUEUE_MEMBER_TIMEOUT}
+retry = ${ASTERISK_QUEUE_RETRY}
+wrapuptime = ${ASTERISK_QUEUE_WRAPUP}
+autofill = yes
+ringinuse = no
+joinempty = no
+leavewhenempty = yes
+setinterfacevar = yes
+setqueueentryvar = yes
+setqueuevar = yes
+
+; Os membros PJSIP são acrescentados pelo entrypoint. Ramais não atribuídos
+; não recebem a credencial e permanecem indisponíveis para a fila.

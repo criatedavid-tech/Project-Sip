@@ -2,9 +2,12 @@ node_modules/
 dist/
 .next/
 .turbo/
+.local/
 build/
 coverage/
 *.tsbuildinfo
+__pycache__/
+*.py[cod]
 
 .env
 .env.local
