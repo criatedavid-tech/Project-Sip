@@ -1,0 +1,693 @@
+.page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 80% -10%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 32rem),
+    var(--bg);
+}
+
+.content {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  padding: 32px;
+}
+
+.titleRow,
+.metricTop,
+.cardHeading,
+.dialRow,
+.recordingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.titleRow h1 {
+  margin: 2px 0 3px;
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.subtitle,
+.cardHeading p,
+.metricCard small,
+.extensionCaption,
+.notice {
+  color: var(--text-muted);
+}
+
+.subtitle {
+  margin: 0;
+}
+
+.refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 15px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.refresh:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.refresh:disabled {
+  opacity: 0.65;
+}
+
+.error {
+  margin-top: 20px;
+  padding: 12px 16px;
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin: 28px 0 16px;
+}
+
+.metricCard,
+.card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: var(--shadow);
+}
+
+.metricCard {
+  display: flex;
+  min-height: 142px;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 19px;
+}
+
+.metricTop {
+  width: 100%;
+}
+
+.metricCard > span,
+.metricTop > span:first-child {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.metricCard strong {
+  margin-top: auto;
+  font-size: 17px;
+}
+
+.metricCard .metricValue {
+  font-size: 32px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.trunkList {
+  display: grid;
+  width: 100%;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.trunkRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.trunkRow strong {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: normal;
+}
+
+.metricCard small {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.75fr) minmax(540px, 1.8fr);
+  gap: 16px;
+}
+
+.singleColumn {
+  grid-template-columns: minmax(280px, 520px);
+}
+
+.filters {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 26px 0 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.managementGrid {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.72fr) minmax(620px, 1.55fr);
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.adminForm {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 20px;
+}
+
+.adminForm .filterField:nth-child(1),
+.adminForm .filterField:nth-child(2),
+.adminForm .filterField:nth-child(3) {
+  grid-column: 1 / -1;
+}
+
+.adminForm .callButton {
+  align-self: end;
+  min-height: 39px;
+}
+
+.filterField {
+  display: grid;
+  min-width: 170px;
+  gap: 6px;
+}
+
+.filterField span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.filterField input,
+.filterField select {
+  min-height: 39px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.scopeNotice {
+  margin: 0 0 16px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.shortcutCard {
+  display: grid;
+  gap: 5px;
+  padding: 19px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  text-decoration: none;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.shortcutCard:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.shortcutCard span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.card {
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.cardHeading {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cardHeading h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.cardHeading p {
+  margin: 2px 0 0;
+  font-size: 12px;
+}
+
+.dialerCard {
+  padding-bottom: 20px;
+}
+
+.extensionValue {
+  margin: 24px 20px 0;
+  font-size: 35px;
+  font-weight: 750;
+  letter-spacing: -0.04em;
+}
+
+.extensionCaption {
+  margin: 0 20px 24px;
+  font-size: 12px;
+}
+
+.phoneLabel {
+  display: block;
+  margin: 0 20px 7px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.dialRow {
+  margin: 0 20px;
+}
+
+.phoneInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.providerSelect {
+  width: calc(100% - 40px);
+  margin: 0 20px 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.callButton {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 9px;
+  background: #268a4b;
+  color: white;
+  font-weight: 700;
+}
+
+.hangupButton {
+  background: #c9363f;
+}
+
+.phoneInput:disabled,
+.providerSelect:disabled,
+.callButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.hiddenAudio {
+  display: none;
+}
+
+.phoneError,
+.inlineError {
+  color: var(--danger-text);
+  font-size: 12px;
+}
+
+.phoneError {
+  margin: 10px 20px 0;
+}
+
+.inlineError {
+  margin: 12px 20px 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--danger-bg);
+}
+
+.notice {
+  margin: 18px 20px 0;
+  padding: 11px 12px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg));
+  font-size: 12px;
+}
+
+.count {
+  min-width: 27px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.statusGood {
+  border-color: color-mix(in srgb, #268a4b 32%, transparent);
+  background: color-mix(in srgb, #268a4b 9%, transparent);
+  color: #268a4b;
+}
+
+.statusBad {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.statusNeutral {
+  border-color: var(--border);
+  background: var(--bg);
+  color: var(--text-muted);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.tableWrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tableWrap th,
+.tableWrap td {
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tableWrap tr:last-child td {
+  border-bottom: 0;
+}
+
+.tableWrap th {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.tableWrap td strong,
+.tableWrap td small {
+  display: block;
+}
+
+.tableWrap td small {
+  color: var(--text-muted);
+}
+
+.emptyState {
+  display: flex;
+  min-height: 132px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.emptyState strong {
+  color: var(--text);
+}
+
+.emptyState span {
+  margin-top: 3px;
+  font-size: 13px;
+}
+
+.recordingList {
+  padding: 0 20px;
+}
+
+.recordingRow {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 180px 80px auto;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.recordingRow:last-child {
+  border-bottom: 0;
+}
+
+.recordingRow div,
+.recordingRow span {
+  min-width: 0;
+}
+
+.recordingRow div strong,
+.recordingRow div span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recordingRow div span,
+.recordingRow > span {
+  color: var(--text-muted);
+}
+
+.recordingRow > .status {
+  color: inherit;
+  justify-self: end;
+}
+
+.recordingAction {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.listenButton {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.listenButton:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.recordingPlayer {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 38px;
+  margin-top: 10px;
+}
+
+.transcriptionState,
+.transcriptionPanel {
+  grid-column: 1 / -1;
+}
+
+.transcriptionState {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.transcriptionState small {
+  color: var(--danger-text);
+  font-size: 12px;
+}
+
+.transcriptionPanel {
+  margin: 2px 0 4px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+}
+
+.transcriptionPanel summary {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.transcriptionSegments,
+.transcriptionText,
+.mockNotice {
+  margin: 10px 0 0;
+}
+
+.transcriptionSegments p {
+  display: grid;
+  grid-template-columns: minmax(105px, auto) 1fr;
+  gap: 10px;
+  margin: 8px 0;
+  line-height: 1.45;
+}
+
+.transcriptionSegments strong {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.transcriptionSegments span,
+.transcriptionText {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.mockNotice {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+@media (max-width: 1050px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .managementGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filterField {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .content {
+    padding: 22px 14px;
+  }
+
+  .titleRow {
+    align-items: flex-start;
+  }
+
+  .subtitle {
+    max-width: 32ch;
+  }
+
+  .metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .filters {
+    grid-template-columns: 1fr;
+  }
+
+  .adminForm {
+    grid-template-columns: 1fr;
+  }
+
+  .adminForm .filterField {
+    grid-column: 1;
+  }
+
+  .metricCard {
+    min-height: 125px;
+  }
+
+  .recordingRow {
+    grid-template-columns: 1fr auto;
+  }
+
+  .recordingRow > span:nth-child(2),
+  .recordingRow > span:nth-child(3) {
+    display: none;
+  }
+}

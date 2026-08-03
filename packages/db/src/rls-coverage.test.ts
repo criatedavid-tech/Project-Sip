@@ -88,11 +88,20 @@ describe.skipIf(!adminUrl)("cobertura de RLS", () => {
       select table_name, string_agg(privilege_type, ',' order by privilege_type) as privileges
       from information_schema.role_table_grants
       where grantee = 'omni_app'
-        and table_name in ('messages', 'conversations', 'contacts', 'event_outbox')
+        and table_name in (
+          'messages',
+          'conversations',
+          'contacts',
+          'event_outbox',
+          'telephony_extensions',
+          'voice_calls',
+          'call_recordings',
+          'call_transcriptions'
+        )
       group by table_name
     `);
 
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(8);
     for (const row of rows) {
       expect(row.privileges).toBe("DELETE,INSERT,SELECT,UPDATE");
     }

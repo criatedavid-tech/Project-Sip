@@ -8,10 +8,17 @@ export default tseslint.config(
   prettier,
   {
     rules: {
+      "no-console": "error",
       "@typescript-eslint/no-unused-vars": [
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+    },
+  },
+  {
+    files: ["**/*.test.ts", "**/*.test.tsx"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
   {

@@ -68,7 +68,76 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-omni-recordings}
 
+  whisper:
+    build:
+      context: ./whisper
+    restart: unless-stopped
+    environment:
+      WHISPER_MODEL: ${WHISPER_MODEL:-small}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      WHISPER_MODEL_CACHE: /models
+      WHISPER_CPU_THREADS: ${WHISPER_CPU_THREADS:-8}
+      WHISPER_BEAM_SIZE: ${WHISPER_BEAM_SIZE:-5}
+      WHISPER_MAX_UPLOAD_MB: ${WHISPER_MAX_UPLOAD_MB:-250}
+    ports:
+      - "127.0.0.1:${WHISPER_PORT:-8090}:8090"
+    volumes:
+      - whisper_models:/models
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=2)"
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 20s
+
+  asterisk:
+    build:
+      context: ./asterisk
+    restart: unless-stopped
+    environment:
+      SIP_TRUNK_HOST: ${SIP_TRUNK_HOST:?SIP_TRUNK_HOST obrigatorio}
+      SIP_USERNAME: ${SIP_USERNAME:?SIP_USERNAME obrigatorio}
+      SIP_PASSWORD: ${SIP_PASSWORD:?SIP_PASSWORD obrigatorio}
+      SIP_SUPPORTED_CODECS: ${SIP_SUPPORTED_CODECS:-alaw,ulaw}
+      WAVOIP_SIP_HOST: ${WAVOIP_SIP_HOST:?WAVOIP_SIP_HOST obrigatorio}
+      WAVOIP_SIP_PORT: ${WAVOIP_SIP_PORT:-5060}
+      WAVOIP_SIP_USERNAME: ${WAVOIP_SIP_USERNAME:?WAVOIP_SIP_USERNAME obrigatorio}
+      WAVOIP_SIP_PASSWORD: ${WAVOIP_SIP_PASSWORD:?WAVOIP_SIP_PASSWORD obrigatorio}
+      WAVOIP_CALLER_ID: ${WAVOIP_CALLER_ID:?WAVOIP_CALLER_ID obrigatorio}
+      WAVOIP_SUPPORTED_CODECS: ${WAVOIP_SUPPORTED_CODECS:-alaw,ulaw}
+      ASTERISK_EXTERNAL_ADDRESS: ${ASTERISK_EXTERNAL_ADDRESS:-}
+      ASTERISK_ARI_USERNAME: ${ASTERISK_ARI_USERNAME:?ASTERISK_ARI_USERNAME obrigatorio}
+      ASTERISK_ARI_PASSWORD: ${ASTERISK_ARI_PASSWORD:?ASTERISK_ARI_PASSWORD obrigatorio}
+      ASTERISK_ARI_APP: ${ASTERISK_ARI_APP:-omnichannel}
+      ASTERISK_WEBRTC_1001_PASSWORD: ${ASTERISK_WEBRTC_1001_PASSWORD:?ASTERISK_WEBRTC_1001_PASSWORD obrigatorio}
+      ASTERISK_WEBRTC_1002_PASSWORD: ${ASTERISK_WEBRTC_1002_PASSWORD:?ASTERISK_WEBRTC_1002_PASSWORD obrigatorio}
+      ASTERISK_WEBRTC_SECRET: ${ASTERISK_WEBRTC_SECRET:-}
+      ASTERISK_EXTENSION_START: ${ASTERISK_EXTENSION_START:-1001}
+      ASTERISK_EXTENSION_END: ${ASTERISK_EXTENSION_END:-1099}
+      ASTERISK_QUEUE_NAME: ${ASTERISK_QUEUE_NAME:-vendas}
+      ASTERISK_QUEUE_STRATEGY: ${ASTERISK_QUEUE_STRATEGY:-rrmemory}
+      ASTERISK_QUEUE_MEMBER_TIMEOUT: ${ASTERISK_QUEUE_MEMBER_TIMEOUT:-20}
+      ASTERISK_QUEUE_RETRY: ${ASTERISK_QUEUE_RETRY:-3}
+      ASTERISK_QUEUE_WRAPUP: ${ASTERISK_QUEUE_WRAPUP:-5}
+      ASTERISK_QUEUE_MAX_WAIT: ${ASTERISK_QUEUE_MAX_WAIT:-45}
+      ASTERISK_RTP_START: ${ASTERISK_RTP_START:-10000}
+      ASTERISK_RTP_END: ${ASTERISK_RTP_END:-10099}
+    ports:
+      - "${ASTERISK_SIP_PORT:-5060}:5060/udp"
+      - "127.0.0.1:${ASTERISK_HTTP_PORT:-8088}:8088"
+      - "${ASTERISK_RTP_START:-10000}-${ASTERISK_RTP_END:-10099}:${ASTERISK_RTP_START:-10000}-${ASTERISK_RTP_END:-10099}/udp"
+    volumes:
+      # Bind local deliberado no ambiente de desenvolvimento: o worker no host
+      # consegue indexar o WAV e a API o entrega somente após autorização.
+      - ./.local/asterisk-recordings:/var/spool/asterisk/monitor
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+  whisper_models:

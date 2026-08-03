@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { AppHeader } from "@/components/app-header";
 import { useSession } from "@/components/session-provider";
 import {
   api,
@@ -22,7 +23,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function InboxPage() {
-  const { session, loading, logout } = useSession();
+  const { session, loading } = useSession();
   const router = useRouter();
 
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
@@ -116,22 +117,7 @@ export default function InboxPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <span className={styles.brand}>Omni Platform</span>
-        <div className={styles.headerRight}>
-          <span>{session.user.name}</span>
-          <button
-            className={styles.logout}
-            type="button"
-            onClick={async () => {
-              await logout();
-              router.replace("/login");
-            }}
-          >
-            Sair
-          </button>
-        </div>
-      </header>
+      <AppHeader />
 
       <div className={styles.body}>
         <aside
