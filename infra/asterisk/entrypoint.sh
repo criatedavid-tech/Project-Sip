@@ -30,6 +30,7 @@ export WAVOIP_SUPPORTED_CODECS="${WAVOIP_SUPPORTED_CODECS:-alaw,ulaw}"
 export ASTERISK_ARI_APP="${ASTERISK_ARI_APP:-omnichannel}"
 export ASTERISK_RTP_START="${ASTERISK_RTP_START:-10000}"
 export ASTERISK_RTP_END="${ASTERISK_RTP_END:-10099}"
+export ASTERISK_STUN_ADDRESS="${ASTERISK_STUN_ADDRESS:-stun.l.google.com:19302}"
 export ASTERISK_EXTENSION_START="${ASTERISK_EXTENSION_START:-1001}"
 export ASTERISK_EXTENSION_END="${ASTERISK_EXTENSION_END:-1099}"
 export ASTERISK_QUEUE_NAME="${ASTERISK_QUEUE_NAME:-vendas}"
@@ -105,9 +106,9 @@ password = $extension_password
 type = aor
 max_contacts = 1
 remove_existing = yes
-# O navegador WebRTC mantem o transporte WebSocket ativo. O qualify por SIP
-# OPTIONS pode marcar clientes SIP.js registrados como indisponiveis, gerando
-# um falso "Offline" no ARI. Zero preserva o estado pelo registro do contato.
+; O navegador WebRTC mantem o transporte WebSocket ativo. O qualify por SIP
+; OPTIONS pode marcar clientes SIP.js registrados como indisponiveis, gerando
+; um falso "Offline" no ARI. Zero preserva o estado pelo registro do contato.
 qualify_frequency = 0
 
 [$extension]
@@ -120,6 +121,10 @@ aors = $extension
 auth = $extension-auth
 webrtc = yes
 direct_media = no
+force_rport = yes
+rewrite_contact = yes
+rtp_symmetric = yes
+rtp_keepalive = 20
 dtmf_mode = rfc4733
 EOF
   printf 'member => PJSIP/%s,%s\n' "$extension" "$extension" >> /etc/asterisk/queues.conf

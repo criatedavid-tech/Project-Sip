@@ -19,6 +19,7 @@ allow_reload = no
 type = transport
 protocol = ws
 bind = 0.0.0.0
+allow_reload = no
 
 ; Tronco DirectCall. As credenciais entram apenas no container em runtime.
 [directcall-registration]
