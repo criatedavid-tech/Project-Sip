@@ -42,30 +42,37 @@ C:\Users\Criate\Documents\Codex\omni-platform
 - Separação de acesso entre administrador, supervisor e atendente.
 - Isolamento de organizações no PostgreSQL com Row Level Security.
 
-### Validado em ambiente local
+### Validado na VPS de homologação
 
 - Registro do tronco DirectCall no Asterisk.
-- Registro do ramal WebRTC `1001`.
-- Ligação de saída pela DirectCall.
+- Registro do tronco WaVoIP no Asterisk.
+- Registro de ramais WebRTC individuais pelo navegador usando HTTPS/WSS.
+- Ligações de saída reais pela DirectCall e pela WaVoIP.
+- Áudio bidirecional com terceiros após o ajuste de ICE/STUN e RTP simétrico.
 - Persistência do histórico de chamadas.
 - Captura de eventos do Asterisk pelo worker de telefonia.
-- Gravação e processamento de transcrição.
+- Gravação e processamento local de transcrição para chamadas telefônicas.
+- Login, administração de colaboradores e atribuição dos ramais `1001` e `1002`.
 
 ### Pendente ou parcialmente validado
 
-- Recebimento de ligações da DirectCall no ambiente local.
-- Registro atual da conta WaVoIP, que depende de credenciais válidas do
-  dispositivo.
-- Implantação em VPS com IPv4 público.
-- TLS/WSS para uso do telefone WebRTC fora do computador local.
+- Migrar a VPS de homologação, atualmente sustentada pelos créditos do Free
+  Trial, para uma instância elegível ao Oracle Always Free antes do vencimento.
+- Validar uma ligação recebida da DirectCall de ponta a ponta: fila, atendimento,
+  áudio, gravação e transcrição.
+- Corrigir a gravação das chamadas WaVoIP, que ainda aparece como `failed` mesmo
+  quando a ligação e o áudio ao vivo são concluídos.
 - Armazenamento definitivo das gravações em objeto S3/MinIO.
 - Política empresarial de retenção e descarte de áudio.
 - Auditoria de cada reprodução ou download de gravação.
+- Backup externo, monitoramento e testes de chamadas simultâneas.
 
-O recebimento da DirectCall não chegou ao Asterisk durante o último teste. O
-tronco estava registrado, mas nenhum pacote SIP de entrada apareceu nos logs.
-O diagnóstico aponta para NAT, ausência de redirecionamento de portas no
-roteador ou roteamento do número de teste pelo provedor.
+O ambiente publicado é de homologação. Não deve ser tratado como produção até
+que backup, retenção, monitoramento, segurança operacional e testes de entrada e
+concorrência estejam concluídos.
+
+O checklist de maior prioridade está em
+[`docs/URGENTES-OPERACAO.md`](docs/URGENTES-OPERACAO.md).
 
 ## 3. Arquitetura
 
@@ -316,16 +323,20 @@ Para receber chamadas em uma máquina atrás de NAT, normalmente são necessári
 - firewall restrito aos IPs do provedor sempre que possível.
 - SIP ALG desabilitado quando causar registro instável ou áudio unilateral.
 
-Sem acesso ao roteador local, a recomendação é hospedar o Asterisk em uma VPS
-com IPv4 público e usar HTTPS/WSS com certificado válido.
+O ambiente atual hospeda o Asterisk em uma VPS com IPv4 público, HTTPS/WSS e
+certificado válido. ICE/STUN, RTP simétrico e `rtp_keepalive` foram habilitados
+para estabilizar o áudio WebRTC através de NAT. Redes corporativas mais
+restritivas ainda podem exigir um servidor TURN.
 
 ### 10.4 Provedores
 
 **DirectCall:** telefonia fixa e móvel por tronco SIP. O registro e as ligações
-de saída foram validados no ambiente de teste.
+de saída foram validados na VPS. A entrada pelo DID ainda precisa de validação
+completa.
 
 **WaVoIP:** chamadas de voz do WhatsApp apresentadas ao Asterisk como um segundo
-tronco SIP. É independente da integração de mensagens da Meta.
+tronco SIP. As chamadas e o áudio ao vivo foram validados, mas a gravação ainda
+falha. É independente da integração de mensagens da Meta.
 
 **Meta WhatsApp Cloud API:** mensagens de texto e eventos do WhatsApp Business.
 Não fornece ao Asterisk as chamadas de voz tradicionais do aplicativo.
@@ -468,22 +479,22 @@ docker compose --env-file .env -f infra/docker-compose.yml exec asterisk asteris
   endereços do provedor.
 - Realizar backup criptografado do banco e das gravações.
 
-## 17. Estratégia recomendada para VPS
+## 17. Operação na VPS
 
-1. Criar uma VPS Linux com IPv4 público fixo.
-2. Configurar DNS e certificados TLS.
-3. Subir Asterisk, API, worker, PostgreSQL, Redis, MinIO e Whisper em rede
-   privada de containers.
-4. Expor somente HTTPS/WSS, SIP e o intervalo RTP necessário.
-5. Restringir SIP aos IPs publicados pelos provedores.
-6. Configurar backup externo e retenção.
-7. Monitorar saúde, espaço em disco, filas e falhas de transcrição.
-8. Testar chamadas de entrada, saída, áudio bidirecional e gravação antes de
-   migrar os atendentes.
+O conjunto completo está implantado em uma VPS Oracle de homologação com IPv4
+público, proxy HTTPS, WebSocket seguro e containers em rede privada. A máquina
+atual não é permanente: utiliza créditos do Free Trial e precisa ser migrada
+antes do fim da avaliação.
 
-Para uma primeira migração, também é possível colocar apenas o Asterisk na VPS
-e manter os demais componentes locais, mas isso aumenta a complexidade de rede.
-Hospedar o conjunto completo costuma ser mais previsível.
+Antes do uso diário:
+
+1. Migrar para uma shape explicitamente marcada como Always Free e confirmar
+   custo estimado igual a zero antes da criação.
+2. Expor somente HTTPS, SIP restrito aos provedores e o intervalo RTP necessário.
+3. Manter API, ARI, PostgreSQL, Redis, MinIO e Whisper sem exposição pública.
+4. Configurar backup externo e testar uma restauração.
+5. Monitorar saúde, espaço em disco, registros SIP, filas e transcrições.
+6. Testar entrada, saída, áudio, gravação e chamadas simultâneas.
 
 ## 18. Diagnóstico rápido
 
@@ -541,24 +552,21 @@ local. Depois use a ação de tentar novamente na tela de gravações.
 
 ## 19. Próximos passos
 
-1. Implantar o Asterisk ou toda a plataforma em VPS.
+1. Migrar a VPS temporária para Oracle Always Free ou desligá-la antes de terminar
+   o Free Trial.
 2. Validar chamadas recebidas da DirectCall.
-3. Atualizar e validar as credenciais WaVoIP.
-4. Migrar gravações para MinIO/S3.
+3. Corrigir gravação e transcrição das chamadas WaVoIP.
+4. Migrar gravações para armazenamento externo S3/MinIO.
 5. Implementar auditoria de reprodução e download.
-6. Definir retenção e consentimento de gravações.
-7. Configurar TLS/WSS e proxy reverso.
-8. Adicionar monitoramento, alertas e backup.
-9. Criar testes end-to-end do navegador e de chamadas.
-10. Publicar um runbook de recuperação de incidentes.
+6. Definir retenção, consentimento e descarte das gravações.
+7. Adicionar monitoramento, alertas e backup com restauração testada.
+8. Criar testes end-to-end do navegador e de chamadas simultâneas.
+9. Publicar um runbook de recuperação de incidentes.
 
 ## 20. Controle de versão
 
-O último marco funcional antes desta documentação foi registrado no commit:
-
-```text
-7486e9d feat: implementa telefonia SIP, gravacoes e transcricoes
-```
+Os marcos funcionais, correções da telefonia e mudanças operacionais devem ser
+registrados em commits separados para permitir auditoria e reversão segura.
 
 O projeto é atualmente uma aplicação interna. Não há licença pública definida;
 não assuma permissão de redistribuição sem autorização da empresa.
