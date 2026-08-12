@@ -29,6 +29,7 @@ C:\Users\Criate\Documents\Codex\omni-platform
 - Painel de telefonia.
 - Ramais WebRTC individuais no navegador.
 - Ligações telefônicas por tronco SIP da DirectCall.
+- Ligações telefônicas de saída por Twilio Elastic SIP Trunking.
 - Estrutura SIP para chamadas de voz do WhatsApp via WaVoIP.
 - Histórico de ligações com filtros por dia, colaborador, canal e status.
 - Gravação automática das chamadas atendidas.
@@ -48,6 +49,8 @@ C:\Users\Criate\Documents\Codex\omni-platform
 - Registro do tronco WaVoIP no Asterisk.
 - Registro de ramais WebRTC individuais pelo navegador usando HTTPS/WSS.
 - Ligações de saída reais pela DirectCall e pela WaVoIP.
+- Ligações de saída, gravação e transcrição pela Twilio para destino verificado
+  em conta Trial.
 - Áudio bidirecional com terceiros após o ajuste de ICE/STUN e RTP simétrico.
 - Persistência do histórico de chamadas.
 - Captura de eventos do Asterisk pelo worker de telefonia.
@@ -60,8 +63,12 @@ C:\Users\Criate\Documents\Codex\omni-platform
   Trial, para uma instância elegível ao Oracle Always Free antes do vencimento.
 - Validar uma ligação recebida da DirectCall de ponta a ponta: fila, atendimento,
   áudio, gravação e transcrição.
-- Corrigir a gravação das chamadas WaVoIP, que ainda aparece como `failed` mesmo
-  quando a ligação e o áudio ao vivo são concluídos.
+- Revalidar gravação e transcrição de uma chamada WaVoIP atendida; chamadas
+  canceladas ou não atendidas agora aparecem como `Sem gravação`, em vez de
+  falso erro.
+- Publicar na VPS e validar a correção que preserva o ramal de origem nas novas
+  ligações Twilio. Registros antigos exibidos como `Não atribuída` não são
+  corrigidos automaticamente.
 - Armazenamento definitivo das gravações em objeto S3/MinIO.
 - Política empresarial de retenção e descarte de áudio.
 - Auditoria de cada reprodução ou download de gravação.
@@ -86,6 +93,7 @@ flowchart LR
     A --> M[Meta WhatsApp Cloud API]
     PBX --> DC[DirectCall SIP]
     PBX --> WV[WaVoIP SIP]
+    PBX --> TWILIO[Twilio Elastic SIP Trunking]
     PBX -->|Eventos ARI| TW[Telephony Worker]
     TW --> DB
     TW -->|Arquivo WAV| WH[Whisper local]
@@ -178,6 +186,7 @@ As principais categorias são:
 - Asterisk ARI e WebRTC.
 - DirectCall.
 - WaVoIP.
+- Twilio Elastic SIP Trunking.
 - Meta WhatsApp Cloud API.
 - Whisper local ou OpenAI.
 
@@ -302,7 +311,7 @@ selecionar automaticamente o próximo ramal livre.
 
 1. O usuário autentica seu ramal SIP.js no Asterisk por WebSocket.
 2. O navegador envia a chamada para o Asterisk.
-3. O dialplan seleciona DirectCall ou WaVoIP.
+3. O dialplan seleciona DirectCall, WaVoIP ou Twilio.
 4. O Asterisk inicia a gravação quando a chamada é atendida.
 5. Eventos personalizados são enviados pelo ARI.
 6. O worker persiste a chamada e agenda a transcrição.
@@ -335,8 +344,18 @@ de saída foram validados na VPS. A entrada pelo DID ainda precisa de validaçã
 completa.
 
 **WaVoIP:** chamadas de voz do WhatsApp apresentadas ao Asterisk como um segundo
-tronco SIP. As chamadas e o áudio ao vivo foram validados, mas a gravação ainda
-falha. É independente da integração de mensagens da Meta.
+tronco SIP. As chamadas e o áudio ao vivo foram validados. Chamadas não
+atendidas não devem ser tratadas como falha de gravação; ainda é necessária uma
+revalidação final de uma chamada atendida com áudio e transcrição. É
+independente da integração de mensagens da Meta.
+
+**Twilio:** telefonia fixa e móvel por Elastic SIP Trunking. A integração atual
+usa autenticação por IP ACL, não cria registro SIP e seleciona a rota com o
+prefixo interno `*9`. O Asterisk envia o destino em E.164 com `+`, utiliza um
+Caller ID verificado e preserva separadamente o ramal do navegador para atribuir
+a chamada e a gravação ao colaborador correto. Em conta Trial, somente destinos
+verificados podem ser chamados. O recebimento de chamadas exige um número
+Twilio associado ao tronco e uma Origination URI.
 
 **Meta WhatsApp Cloud API:** mensagens de texto e eventos do WhatsApp Business.
 Não fornece ao Asterisk as chamadas de voz tradicionais do aplicativo.
@@ -495,6 +514,9 @@ Antes do uso diário:
 4. Configurar backup externo e testar uma restauração.
 5. Monitorar saúde, espaço em disco, registros SIP, filas e transcrições.
 6. Testar entrada, saída, áudio, gravação e chamadas simultâneas.
+7. Após alterar o dialplan, validar que uma nova chamada Twilio aparece com o
+   colaborador e o ramal corretos; registros antigos não são retroativamente
+   associados.
 
 ## 18. Diagnóstico rápido
 
@@ -541,6 +563,13 @@ Verifique:
 - caminho `ASTERISK_RECORDINGS_PATH`;
 - permissões do volume.
 
+### Chamada Twilio aparece como `Não atribuída`
+
+Confirme que a rota Twilio salva `CALLERID(num)` em `OMNI_ORIGIN_EXTENSION`
+antes de substituir o Caller ID pelo número verificado. O quinto argumento de
+`record-and-dial` deve usar `OMNI_ORIGIN_EXTENSION`. Depois de atualizar o
+container Asterisk, faça uma nova chamada: o histórico antigo não é alterado.
+
 ### Transcrição falhou
 
 ```powershell
@@ -555,13 +584,14 @@ local. Depois use a ação de tentar novamente na tela de gravações.
 1. Migrar a VPS temporária para Oracle Always Free ou desligá-la antes de terminar
    o Free Trial.
 2. Validar chamadas recebidas da DirectCall.
-3. Corrigir gravação e transcrição das chamadas WaVoIP.
-4. Migrar gravações para armazenamento externo S3/MinIO.
-5. Implementar auditoria de reprodução e download.
-6. Definir retenção, consentimento e descarte das gravações.
-7. Adicionar monitoramento, alertas e backup com restauração testada.
-8. Criar testes end-to-end do navegador e de chamadas simultâneas.
-9. Publicar um runbook de recuperação de incidentes.
+3. Publicar e validar a atribuição de colaborador nas novas chamadas Twilio.
+4. Revalidar gravação e transcrição das chamadas WaVoIP atendidas.
+5. Migrar gravações para armazenamento externo S3/MinIO.
+6. Implementar auditoria de reprodução e download.
+7. Definir retenção, consentimento e descarte das gravações.
+8. Adicionar monitoramento, alertas e backup com restauração testada.
+9. Criar testes end-to-end do navegador e de chamadas simultâneas.
+10. Publicar um runbook de recuperação de incidentes.
 
 ## 20. Controle de versão
 

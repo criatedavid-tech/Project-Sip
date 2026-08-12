@@ -38,6 +38,14 @@ estruturados sem incluir senha ou número de telefone.
 ## Rede e segurança
 
 - SIP DirectCall: UDP 5060.
+- O canal Twilio usa o prefixo interno `*9`, envia E.164 com `+` e autentica
+  pelo IP ACL da VPS; por isso nao aparece em `pjsip show registrations`.
+- A rota Twilio guarda o ramal WebRTC em `OMNI_ORIGIN_EXTENSION` antes de trocar
+  o Caller ID pelo numero verificado. Esse valor deve continuar como o quinto
+  argumento de `record-and-dial`, pois e usado para atribuir a chamada ao
+  colaborador.
+- Contas Twilio Trial ligam somente para destinos verificados e exigem um
+  `TWILIO_CALLER_ID` verificado.
 - RTP da PoC: UDP 10000–10099.
 - Discagem externa aceita apenas números brasileiros no formato `55...`.
 - Chamadas recebidas são identificadas somente pelos IPs publicados pela

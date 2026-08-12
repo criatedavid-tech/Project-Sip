@@ -114,6 +114,31 @@ force_rport = yes
 rewrite_contact = yes
 rtp_symmetric = yes
 
+; Twilio Elastic SIP Trunking usa autenticacao pelo IP publico da VPS.
+; Nao existe registro SIP nem senha quando o IP ACL esta configurado no console.
+[twilio-aor]
+type = aor
+contact = sip:${TWILIO_SIP_DOMAIN}:5060
+qualify_frequency = 30
+
+[twilio]
+type = endpoint
+transport = transport-udp
+context = from-twilio
+disallow = all
+allow = ${TWILIO_SUPPORTED_CODECS}
+aors = twilio-aor
+direct_media = no
+from_domain = ${TWILIO_SIP_DOMAIN}
+from_user = ${TWILIO_CALLER_ID}
+callerid = ${TWILIO_CALLER_ID}
+send_pai = yes
+trust_id_outbound = yes
+dtmf_mode = rfc4733
+force_rport = yes
+rewrite_contact = yes
+rtp_symmetric = yes
+
 ; Os ramais WebRTC são acrescentados pelo entrypoint a partir da faixa
 ; ASTERISK_EXTENSION_START..ASTERISK_EXTENSION_END. O cadastro na aplicação
 ; decide quais credenciais são entregues aos colaboradores.

@@ -45,6 +45,14 @@ export function callStatus(
   }
 }
 
+export function recordingStatus(
+  normalizedCallStatus: string,
+  fileAvailable: boolean,
+): "available" | "failed" | "not_recorded" {
+  if (normalizedCallStatus !== "completed") return "not_recorded";
+  return fileAvailable ? "available" : "failed";
+}
+
 export class CallEventStore {
   private readonly recordingsRoot: string;
 
@@ -149,11 +157,12 @@ export class CallEventStore {
     const recordingFile = this.recordingFile(event.recordingId);
     const file = await stat(recordingFile).catch(() => null);
     const available = Boolean(file?.isFile() && file.size > 44);
+    const normalizedRecordingStatus = recordingStatus(status, available);
 
     await this.db
       .update(schema.callRecordings)
       .set({
-        status: available ? "available" : "failed",
+        status: normalizedRecordingStatus,
         sizeBytes: file?.size ?? null,
         durationSeconds: seconds,
         availableAt: available ? endedAt : null,
@@ -172,6 +181,7 @@ export class CallEventStore {
         recordingId: event.recordingId,
         status,
         recordingAvailable: available,
+        recordingStatus: normalizedRecordingStatus,
       },
       "chamada e gravação persistidas",
     );

@@ -6,10 +6,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-omni}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-omni_dev_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD obrigatorio}
       POSTGRES_DB: ${POSTGRES_DB:-omni}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -23,7 +23,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -38,10 +38,10 @@ services:
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD obrigatorio}
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -65,7 +65,7 @@ services:
         mc anonymous set none local/"$${STORAGE_BUCKET}"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD obrigatorio}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-omni-recordings}
 
   whisper:
@@ -110,6 +110,9 @@ services:
       WAVOIP_SIP_PASSWORD: ${WAVOIP_SIP_PASSWORD:?WAVOIP_SIP_PASSWORD obrigatorio}
       WAVOIP_CALLER_ID: ${WAVOIP_CALLER_ID:?WAVOIP_CALLER_ID obrigatorio}
       WAVOIP_SUPPORTED_CODECS: ${WAVOIP_SUPPORTED_CODECS:-alaw,ulaw}
+      TWILIO_SIP_DOMAIN: ${TWILIO_SIP_DOMAIN:?TWILIO_SIP_DOMAIN obrigatorio}
+      TWILIO_CALLER_ID: ${TWILIO_CALLER_ID:?TWILIO_CALLER_ID obrigatorio}
+      TWILIO_SUPPORTED_CODECS: ${TWILIO_SUPPORTED_CODECS:-ulaw,alaw}
       ASTERISK_EXTERNAL_ADDRESS: ${ASTERISK_EXTERNAL_ADDRESS:-}
       ASTERISK_ARI_USERNAME: ${ASTERISK_ARI_USERNAME:?ASTERISK_ARI_USERNAME obrigatorio}
       ASTERISK_ARI_PASSWORD: ${ASTERISK_ARI_PASSWORD:?ASTERISK_ARI_PASSWORD obrigatorio}

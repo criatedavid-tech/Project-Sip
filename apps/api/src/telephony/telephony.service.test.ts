@@ -24,6 +24,12 @@ describe("summarizeAri", () => {
           state: "online",
           channel_ids: [],
         },
+        {
+          technology: "PJSIP",
+          resource: "twilio",
+          state: "online",
+          channel_ids: [],
+        },
       ],
       channels: [{ id: "agent-1" }, { id: "trunk-1" }],
     });
@@ -34,6 +40,7 @@ describe("summarizeAri", () => {
     expect(result.trunks).toEqual([
       { endpoint: "directcall", label: "DirectCall", status: "online" },
       { endpoint: "wavoip", label: "WhatsApp", status: "online" },
+      { endpoint: "twilio", label: "Twilio", status: "online" },
     ]);
     expect(result.endpointStates["1001"]).toBe("offline");
     expect(result.activeCalls).toBe(1);

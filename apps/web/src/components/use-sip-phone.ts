@@ -12,7 +12,7 @@ export type SipPhoneStatus =
   | "offline"
   | "error";
 
-export type VoiceProvider = "directcall" | "wavoip";
+export type VoiceProvider = "directcall" | "wavoip" | "twilio";
 
 interface SipClient {
   connect(): Promise<void>;
@@ -144,7 +144,12 @@ export function useSipPhone(
     try {
       setError(null);
       setStatus("calling");
-      const dialDestination = provider === "wavoip" ? `*8${destination}` : destination;
+      const dialDestination =
+        provider === "wavoip"
+          ? `*8${destination}`
+          : provider === "twilio"
+            ? `*9${destination}`
+            : destination;
       await client.call(`sip:${dialDestination}@${config.sipDomain}`);
     } catch (callError) {
       setStatus(client.isConnected() ? "ready" : "offline");

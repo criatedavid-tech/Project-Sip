@@ -124,6 +124,7 @@ export default function CallsPage() {
               <option value="">Todos</option>
               <option value="directcall">Telefone</option>
               <option value="wavoip">WhatsApp</option>
+              <option value="twilio">Telefone (Twilio)</option>
               <option value="internal">Interna</option>
             </select>
           </label>

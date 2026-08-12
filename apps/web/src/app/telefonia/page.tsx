@@ -222,6 +222,7 @@ export default function TelephonyPage() {
             >
               <option value="directcall">Telefone — DirectCall</option>
               <option value="wavoip">WhatsApp — WaVoIP</option>
+              <option value="twilio">Telefone - Twilio (teste)</option>
             </select>
             <label className={styles.phoneLabel} htmlFor="phone-number">
               Número para ligar

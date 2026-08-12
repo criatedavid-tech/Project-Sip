@@ -168,6 +168,7 @@ export function summarizeAri(input: {
   };
   const directcallStatus = trunkStatus("directcall");
   const wavoipStatus = trunkStatus("wavoip");
+  const twilioStatus = trunkStatus("twilio");
 
   return {
     available: true,
@@ -179,6 +180,7 @@ export function summarizeAri(input: {
     trunks: [
       { endpoint: "directcall", label: "DirectCall", status: directcallStatus },
       { endpoint: "wavoip", label: "WhatsApp", status: wavoipStatus },
+      { endpoint: "twilio", label: "Twilio", status: twilioStatus },
     ],
     endpointStates,
     activeChannels: channels.length,
@@ -862,6 +864,7 @@ export class TelephonyService {
         trunks: [
           { endpoint: "directcall", label: "DirectCall", status: "unknown" },
           { endpoint: "wavoip", label: "WhatsApp", status: "unknown" },
+          { endpoint: "twilio", label: "Twilio", status: "unknown" },
         ],
         endpointStates: {},
         activeChannels: 0,
