@@ -1,10 +1,30 @@
 import { describe, expect, it } from "vitest";
+import { PERMISSIONS } from "@omni/auth";
+import { REQUIRED_PERMISSIONS } from "../auth/permissions.guard";
+import { TelephonyController } from "./telephony.controller";
 import {
+  buildDashboardMetrics,
+  buildDashboardSeries,
+  callTiming,
+  normalizeDialerPhone,
+  parseDashboardFilters,
   parseTelephonyFilters,
   scopedTelephonyUserId,
   summarizeAri,
   webRtcPassword,
 } from "./telephony.service";
+
+describe("normalizeDialerPhone", () => {
+  it("normaliza números brasileiros locais e com código do país", () => {
+    expect(normalizeDialerPhone("(62) 99999-0000")).toBe("5562999990000");
+    expect(normalizeDialerPhone("+55 11 3333-4444")).toBe("551133334444");
+  });
+
+  it("recusa números incompletos ou com DDD inválido", () => {
+    expect(normalizeDialerPhone("9999-0000")).toBeNull();
+    expect(normalizeDialerPhone("+55 01 99999-0000")).toBeNull();
+  });
+});
 
 describe("summarizeAri", () => {
   it("traduz o estado real do tronco, ramais e canais ativos", () => {
@@ -27,6 +47,12 @@ describe("summarizeAri", () => {
         {
           technology: "PJSIP",
           resource: "twilio",
+          state: "online",
+          channel_ids: [],
+        },
+        {
+          technology: "PJSIP",
+          resource: "nvoip",
           state: "online",
           channel_ids: [],
         },
@@ -110,6 +136,82 @@ describe("telephony access scope", () => {
   it("rejeita uma data inexistente", () => {
     expect(() => parseTelephonyFilters({ date: "2026-02-30" })).toThrow(
       "data inválida",
+    );
+  });
+});
+
+describe("telephony dashboard", () => {
+  const calls = [
+    {
+      status: "completed",
+      direction: "inbound",
+      startedAt: "2026-08-13T12:00:00.000Z",
+      durationSeconds: 60,
+      answerTimeSeconds: 8,
+      wrapUpTimeSeconds: null,
+    },
+    {
+      status: "failed",
+      direction: "outbound",
+      startedAt: "2026-08-13T13:00:00.000Z",
+      durationSeconds: null,
+      answerTimeSeconds: null,
+      wrapUpTimeSeconds: null,
+    },
+  ];
+
+  it("mantém métricas indisponíveis como nulas sem estimar pós-atendimento", () => {
+    expect(buildDashboardMetrics(calls)).toEqual({
+      averageHandleTimeSeconds: null,
+      totalCalls: 2,
+      totalConversationSeconds: 60,
+      averageConversationSeconds: 60,
+      completedCalls: 1,
+      failedCalls: 1,
+    });
+    expect(
+      callTiming({
+        startedAt: "2026-08-13T12:00:00.000Z",
+        answeredAt: "2026-08-13T12:00:08.000Z",
+      }),
+    ).toEqual({ answerTimeSeconds: 8, wrapUpTimeSeconds: null });
+  });
+
+  it("separa ligações de entrada e saída na série temporal", () => {
+    expect(buildDashboardSeries(calls, "hour")).toEqual([
+      { key: "2026-08-13T09", label: "09h", inbound: 1, outbound: 0, total: 1 },
+      { key: "2026-08-13T10", label: "10h", inbound: 0, outbound: 1, total: 1 },
+    ]);
+  });
+
+  it("aceita período inclusivo e recusa intervalos invertidos", () => {
+    const filters = parseDashboardFilters({
+      startDate: "2026-08-01",
+      endDate: "2026-08-13",
+      granularity: "day",
+    });
+    expect(filters.start.toISOString()).toBe("2026-08-01T03:00:00.000Z");
+    expect(filters.end.toISOString()).toBe("2026-08-14T03:00:00.000Z");
+    expect(() =>
+      parseDashboardFilters({
+        startDate: "2026-08-14",
+        endDate: "2026-08-13",
+      }),
+    ).toThrow("período do dashboard inválido");
+  });
+
+  it("exige gestão de usuários e bloqueia o painel para atendentes", () => {
+    const required = Reflect.getMetadata(
+      REQUIRED_PERMISSIONS,
+      TelephonyController.prototype.dashboardAdmin,
+    ) as string[];
+    expect(required).toEqual(
+      expect.arrayContaining([
+        PERMISSIONS.callsRead,
+        PERMISSIONS.recordingsListen,
+        PERMISSIONS.transcriptionsRead,
+        PERMISSIONS.usersManage,
+      ]),
     );
   });
 });

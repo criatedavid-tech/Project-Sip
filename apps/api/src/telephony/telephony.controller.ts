@@ -55,6 +55,20 @@ export class TelephonyController {
     return this.telephony.dailyAdmin(user, query);
   }
 
+  @RequirePermissions(
+    PERMISSIONS.callsRead,
+    PERMISSIONS.recordingsListen,
+    PERMISSIONS.transcriptionsRead,
+    PERMISSIONS.usersManage,
+  )
+  @Get("admin/dashboard")
+  dashboardAdmin(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: Record<string, unknown>,
+  ) {
+    return this.telephony.dashboardAdmin(user, query);
+  }
+
   @RequirePermissions(PERMISSIONS.usersManage)
   @Get("admin/collaborators")
   collaborators(@CurrentUser() user: AuthenticatedUser) {
@@ -107,5 +121,64 @@ export class TelephonyController {
     @Param("id", new ParseUUIDPipe()) recordingId: string,
   ) {
     return this.telephony.retryTranscription(user, recordingId);
+  }
+
+  @RequirePermissions(PERMISSIONS.contactsRead)
+  @Get("dialer/contacts")
+  dialerContacts(@CurrentUser() user: AuthenticatedUser) {
+    return this.telephony.dialerContacts(user);
+  }
+
+  @RequirePermissions(PERMISSIONS.contactsWrite)
+  @Post("dialer/contacts")
+  createDialerContact(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.telephony.createDialerContact(user, body);
+  }
+
+  @RequirePermissions(PERMISSIONS.callsRead)
+  @Get("dialer/campaigns")
+  dialerCampaigns(@CurrentUser() user: AuthenticatedUser) {
+    return this.telephony.dialerCampaigns(user);
+  }
+
+  @RequirePermissions(PERMISSIONS.callsWrite)
+  @Post("dialer/campaigns")
+  createDialerCampaign(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.telephony.createDialerCampaign(user, body);
+  }
+
+  @RequirePermissions(PERMISSIONS.callsWrite)
+  @Patch("dialer/campaigns/:id/status")
+  setDialerCampaignStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id", new ParseUUIDPipe()) campaignId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.telephony.setDialerCampaignStatus(user, campaignId, body);
+  }
+
+  @RequirePermissions(PERMISSIONS.callsWrite)
+  @Post("dialer/campaigns/:id/next")
+  claimNextDialerItem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id", new ParseUUIDPipe()) campaignId: string,
+  ) {
+    return this.telephony.claimNextDialerItem(user, campaignId);
+  }
+
+  @RequirePermissions(PERMISSIONS.callsWrite)
+  @Patch("dialer/items/:id/result")
+  completeDialerItem(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id", new ParseUUIDPipe()) itemId: string,
+    @Body() body: Record<string, unknown>,
+  ) {
+    return this.telephony.completeDialerItem(user, itemId, body);
   }
 }

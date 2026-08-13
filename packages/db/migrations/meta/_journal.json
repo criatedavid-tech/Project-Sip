@@ -71,6 +71,13 @@
       "when": 1785513600000,
       "tag": "0009_telephony_retries",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786636800000,
+      "tag": "0010_telephony_dialer",
+      "breakpoints": true
     }
   ]
 }

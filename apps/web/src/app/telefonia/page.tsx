@@ -47,7 +47,7 @@ export default function TelephonyPage() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("directcall");
+  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("twilio");
 
   const loadOverview = useCallback(async () => {
     if (!session) return;
@@ -222,7 +222,7 @@ export default function TelephonyPage() {
             >
               <option value="directcall">Telefone — DirectCall</option>
               <option value="wavoip">WhatsApp — WaVoIP</option>
-              <option value="twilio">Telefone - Twilio (teste)</option>
+              <option value="twilio">Telefone — Twilio (teste: destinos verificados)</option>
             </select>
             <label className={styles.phoneLabel} htmlFor="phone-number">
               Número para ligar
@@ -314,6 +314,10 @@ export default function TelephonyPage() {
         </section>
 
         <section className={styles.shortcuts} aria-label="Atalhos de telefonia">
+          <Link className={styles.shortcutCard} href="/telefonia/discador">
+            <strong>Discador</strong>
+            <span>Teclado, contatos, campanhas e controles da chamada.</span>
+          </Link>
           <Link className={styles.shortcutCard} href="/telefonia/ligacoes">
             <strong>{ownScope ? "Minhas ligações" : "Histórico de ligações"}</strong>
             <span>Filtrar por dia, colaborador, canal e status.</span>

@@ -139,6 +139,50 @@ force_rport = yes
 rewrite_contact = yes
 rtp_symmetric = yes
 
+; Tronco Nvoip com registro SIP por usuario e senha.
+[nvoip-registration]
+type = registration
+transport = transport-udp
+outbound_auth = nvoip-auth
+server_uri = sip:${NVOIP_SIP_HOST}:${NVOIP_SIP_PORT}
+client_uri = sip:${NVOIP_SIP_USERNAME}@${NVOIP_SIP_HOST}:${NVOIP_SIP_PORT}
+contact_user = ${NVOIP_SIP_USERNAME}
+retry_interval = 60
+forbidden_retry_interval = 300
+expiration = 300
+line = yes
+endpoint = nvoip
+
+[nvoip-auth]
+type = auth
+auth_type = userpass
+username = ${NVOIP_SIP_USERNAME}
+password = ${NVOIP_SIP_PASSWORD}
+
+[nvoip-aor]
+type = aor
+contact = sip:${NVOIP_SIP_HOST}:${NVOIP_SIP_PORT}
+qualify_frequency = 30
+
+[nvoip]
+type = endpoint
+transport = transport-udp
+context = from-nvoip
+disallow = all
+allow = ${NVOIP_SUPPORTED_CODECS}
+outbound_auth = nvoip-auth
+aors = nvoip-aor
+direct_media = no
+from_domain = ${NVOIP_SIP_HOST}
+from_user = ${NVOIP_SIP_USERNAME}
+callerid = ${NVOIP_CALLER_ID}
+send_pai = yes
+trust_id_outbound = yes
+dtmf_mode = rfc4733
+force_rport = yes
+rewrite_contact = yes
+rtp_symmetric = yes
+
 ; Os ramais WebRTC são acrescentados pelo entrypoint a partir da faixa
 ; ASTERISK_EXTENSION_START..ASTERISK_EXTENSION_END. O cadastro na aplicação
 ; decide quais credenciais são entregues aos colaboradores.

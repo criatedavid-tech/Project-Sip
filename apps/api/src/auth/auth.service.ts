@@ -29,7 +29,7 @@ interface Membership {
 export class AuthService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
-    private readonly tokens: TokenIssuer,
+    @Inject(TokenIssuer) private readonly tokens: TokenIssuer,
   ) {}
 
   async login(request: LoginRequest): Promise<LoginResult> {

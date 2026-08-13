@@ -12,7 +12,7 @@ export type SipPhoneStatus =
   | "offline"
   | "error";
 
-export type VoiceProvider = "directcall" | "wavoip" | "twilio";
+export type VoiceProvider = "directcall" | "wavoip" | "twilio" | "nvoip";
 
 interface SipClient {
   connect(): Promise<void>;
@@ -22,6 +22,11 @@ interface SipClient {
   call(destination: string): Promise<void>;
   answer(): Promise<void>;
   hangup(): Promise<void>;
+  hold(): Promise<void>;
+  unhold(): Promise<void>;
+  mute(): void;
+  unmute(): void;
+  sendDTMF(tone: string): Promise<void>;
   isConnected(): boolean;
 }
 
@@ -40,6 +45,8 @@ export function useSipPhone(
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const [status, setStatus] = useState<SipPhoneStatus>("connecting");
   const [error, setError] = useState<string | null>(null);
+  const [muted, setMuted] = useState(false);
+  const [held, setHeld] = useState(false);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -71,6 +78,8 @@ export function useSipPhone(
             },
             onCallHangup: () => {
               if (cancelled) return;
+              setMuted(false);
+              setHeld(false);
               setStatus(client?.isConnected() ? "ready" : "offline");
               onCallEnded();
             },
@@ -149,7 +158,9 @@ export function useSipPhone(
           ? `*8${destination}`
           : provider === "twilio"
             ? `*9${destination}`
-            : destination;
+            : provider === "nvoip"
+              ? `*7${destination}`
+              : destination;
       await client.call(`sip:${dialDestination}@${config.sipDomain}`);
     } catch (callError) {
       setStatus(client.isConnected() ? "ready" : "offline");
@@ -188,5 +199,50 @@ export function useSipPhone(
     }
   }, []);
 
-  return { status, error, remoteAudioRef, call, answer, hangup };
+  const toggleMute = useCallback(() => {
+    const client = clientRef.current;
+    if (!client || status !== "active") return;
+    if (muted) client.unmute();
+    else client.mute();
+    setMuted(!muted);
+  }, [muted, status]);
+
+  const toggleHold = useCallback(async () => {
+    const client = clientRef.current;
+    if (!client || status !== "active") return;
+    try {
+      if (held) await client.unhold();
+      else await client.hold();
+      setHeld(!held);
+    } catch (holdError) {
+      setError(
+        holdError instanceof Error
+          ? holdError.message
+          : "Não foi possível alterar a espera da ligação.",
+      );
+    }
+  }, [held, status]);
+
+  const sendDTMF = useCallback(async (tone: string) => {
+    if (!/^[0-9*#]$/.test(tone) || status !== "active") return;
+    try {
+      await clientRef.current?.sendDTMF(tone);
+    } catch {
+      setError("Não foi possível enviar o tom DTMF.");
+    }
+  }, [status]);
+
+  return {
+    status,
+    error,
+    muted,
+    held,
+    remoteAudioRef,
+    call,
+    answer,
+    hangup,
+    toggleMute,
+    toggleHold,
+    sendDTMF,
+  };
 }

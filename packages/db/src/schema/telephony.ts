@@ -12,6 +12,7 @@ import {
 import { primaryId, timestamps } from "./_shared";
 import { organizations } from "./organizations";
 import { users } from "./users";
+import { contacts } from "./contacts";
 
 /** Ramal individual que identifica quem originou ou recebeu uma chamada. */
 export const telephonyExtensions = pgTable(
@@ -155,6 +156,79 @@ export const callTranscriptions = pgTable(
       table.createdAt,
     ),
     index("call_transcriptions_retry_idx").on(table.status, table.nextRetryAt),
+  ],
+);
+
+/** Campanha de discagem progressiva, controlada por supervisor ou administrador. */
+export const dialerCampaigns = pgTable(
+  "dialer_campaigns",
+  {
+    id: primaryId(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    provider: text("provider").notNull().default("twilio"),
+    status: text("status").notNull().default("draft"),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("dialer_campaigns_org_status_idx").on(
+      table.organizationId,
+      table.status,
+    ),
+  ],
+);
+
+/** Contato enfileirado em uma campanha e atribuído a um atendente por vez. */
+export const dialerCampaignItems = pgTable(
+  "dialer_campaign_items",
+  {
+    id: primaryId(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    campaignId: uuid("campaign_id")
+      .notNull()
+      .references(() => dialerCampaigns.id, { onDelete: "cascade" }),
+    contactId: uuid("contact_id").references(() => contacts.id, {
+      onDelete: "set null",
+    }),
+    phoneNumber: text("phone_number").notNull(),
+    position: integer("position").notNull(),
+    status: text("status").notNull().default("pending"),
+    assignedUserId: uuid("assigned_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    disposition: text("disposition"),
+    notes: text("notes"),
+    voiceCallId: uuid("voice_call_id").references(() => voiceCalls.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("dialer_campaign_items_campaign_position_unique").on(
+      table.campaignId,
+      table.position,
+    ),
+    index("dialer_campaign_items_queue_idx").on(
+      table.organizationId,
+      table.campaignId,
+      table.status,
+      table.position,
+    ),
+    index("dialer_campaign_items_assigned_idx").on(
+      table.assignedUserId,
+      table.status,
+    ),
   ],
 );
 

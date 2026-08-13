@@ -27,8 +27,13 @@ C:\Users\Criate\Documents\Codex\omni-platform
 - Caixa de entrada para conversas do WhatsApp.
 - Janela de atendimento de 24 horas da Meta.
 - Painel de telefonia.
+- Discador WebRTC com teclado, DTMF, mudo e espera.
+- Agenda de contatos com clique para ligar.
+- Campanhas de discagem progressiva com distribuição de um contato por vez.
+- Registro de resultado e observações por contato da campanha.
 - Ramais WebRTC individuais no navegador.
 - Ligações telefônicas por tronco SIP da DirectCall.
+- Ligações telefônicas por tronco SIP da Nvoip.
 - Ligações telefônicas de saída por Twilio Elastic SIP Trunking.
 - Estrutura SIP para chamadas de voz do WhatsApp via WaVoIP.
 - Histórico de ligações com filtros por dia, colaborador, canal e status.
@@ -69,6 +74,8 @@ C:\Users\Criate\Documents\Codex\omni-platform
 - Publicar na VPS e validar a correção que preserva o ramal de origem nas novas
   ligações Twilio. Registros antigos exibidos como `Não atribuída` não são
   corrigidos automaticamente.
+- Publicar na VPS e validar registro, chamada de saída, áudio, gravação e
+  transcrição pelo tronco Nvoip.
 - Armazenamento definitivo das gravações em objeto S3/MinIO.
 - Política empresarial de retenção e descarte de áudio.
 - Auditoria de cada reprodução ou download de gravação.
@@ -81,6 +88,13 @@ concorrência estejam concluídos.
 O checklist de maior prioridade está em
 [`docs/URGENTES-OPERACAO.md`](docs/URGENTES-OPERACAO.md).
 
+A arquitetura, a operação local e o checklist específico do discador estão em
+[`docs/DISCADOR.md`](docs/DISCADOR.md).
+
+O escopo consolidado do dashboard, do discador, das integrações SIP, das
+validações e das pendências desta entrega está em
+[`docs/ENTREGA-TELEFONIA-2026-08-13.md`](docs/ENTREGA-TELEFONIA-2026-08-13.md).
+
 ## 3. Arquitetura
 
 ```mermaid
@@ -92,6 +106,7 @@ flowchart LR
     A --> R[(Redis)]
     A --> M[Meta WhatsApp Cloud API]
     PBX --> DC[DirectCall SIP]
+    PBX --> NV[Nvoip SIP]
     PBX --> WV[WaVoIP SIP]
     PBX --> TWILIO[Twilio Elastic SIP Trunking]
     PBX -->|Eventos ARI| TW[Telephony Worker]
@@ -185,6 +200,7 @@ As principais categorias são:
 - segredos JWT.
 - Asterisk ARI e WebRTC.
 - DirectCall.
+- Nvoip.
 - WaVoIP.
 - Twilio Elastic SIP Trunking.
 - Meta WhatsApp Cloud API.
@@ -311,7 +327,7 @@ selecionar automaticamente o próximo ramal livre.
 
 1. O usuário autentica seu ramal SIP.js no Asterisk por WebSocket.
 2. O navegador envia a chamada para o Asterisk.
-3. O dialplan seleciona DirectCall, WaVoIP ou Twilio.
+3. O dialplan seleciona DirectCall, Nvoip, WaVoIP ou Twilio.
 4. O Asterisk inicia a gravação quando a chamada é atendida.
 5. Eventos personalizados são enviados pelo ARI.
 6. O worker persiste a chamada e agenda a transcrição.
@@ -342,6 +358,12 @@ restritivas ainda podem exigir um servidor TURN.
 **DirectCall:** telefonia fixa e móvel por tronco SIP. O registro e as ligações
 de saída foram validados na VPS. A entrada pelo DID ainda precisa de validação
 completa.
+
+**Nvoip:** telefonia fixa e móvel por tronco SIP autenticado com usuário e
+senha. A rota usa o prefixo interno `*7`, removido antes de enviar o número
+brasileiro no formato `55...` ao provedor. As credenciais ficam exclusivamente
+no `.env`. A integração está implementada e testada em build, mas ainda requer
+implantação e validação de uma chamada real na VPS.
 
 **WaVoIP:** chamadas de voz do WhatsApp apresentadas ao Asterisk como um segundo
 tronco SIP. As chamadas e o áudio ao vivo foram validados. Chamadas não
@@ -444,6 +466,8 @@ As principais tabelas são:
 - `voice_calls`: histórico normalizado de chamadas.
 - `call_recordings`: metadados dos áudios.
 - `call_transcriptions`: texto, segmentos e retentativas.
+- `dialer_campaigns`: campanhas, canal, estado e responsável.
+- `dialer_campaign_items`: fila progressiva, atribuição e resultado do contato.
 - `audit_logs`: estrutura de auditoria.
 - `webhook_deliveries`, `event_outbox`: eventos e processamento confiável.
 
@@ -581,17 +605,21 @@ local. Depois use a ação de tentar novamente na tela de gravações.
 
 ## 19. Próximos passos
 
-1. Migrar a VPS temporária para Oracle Always Free ou desligá-la antes de terminar
+1. Concluir e validar localmente o discador progressivo descrito em
+   [`docs/DISCADOR.md`](docs/DISCADOR.md) antes de qualquer novo deploy.
+2. Migrar a VPS temporária para Oracle Always Free ou desligá-la antes de terminar
    o Free Trial.
-2. Validar chamadas recebidas da DirectCall.
-3. Publicar e validar a atribuição de colaborador nas novas chamadas Twilio.
-4. Revalidar gravação e transcrição das chamadas WaVoIP atendidas.
-5. Migrar gravações para armazenamento externo S3/MinIO.
-6. Implementar auditoria de reprodução e download.
-7. Definir retenção, consentimento e descarte das gravações.
-8. Adicionar monitoramento, alertas e backup com restauração testada.
-9. Criar testes end-to-end do navegador e de chamadas simultâneas.
-10. Publicar um runbook de recuperação de incidentes.
+3. Implantar e validar o tronco Nvoip: registro, chamada real, áudio, gravação e
+   transcrição.
+4. Validar chamadas recebidas da DirectCall.
+5. Publicar e validar a atribuição de colaborador nas novas chamadas Twilio.
+6. Revalidar gravação e transcrição das chamadas WaVoIP atendidas.
+7. Migrar gravações para armazenamento externo S3/MinIO.
+8. Implementar auditoria de reprodução e download.
+9. Definir retenção, consentimento e descarte das gravações.
+10. Adicionar monitoramento, alertas e backup com restauração testada.
+11. Criar testes end-to-end do navegador e de chamadas simultâneas.
+12. Publicar um runbook de recuperação de incidentes.
 
 ## 20. Controle de versão
 

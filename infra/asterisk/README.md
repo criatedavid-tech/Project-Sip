@@ -1,8 +1,9 @@
 # Asterisk local
 
-Base da Fase 3 para validar dois ramais WebRTC, o tronco DirectCall e gravação
-local. Credenciais reais nunca ficam nesta pasta: entram pelo `.env`, que é
-ignorado pelo Git, e os arquivos finais são gerados dentro do container.
+Base da Fase 3 para validar ramais WebRTC, os troncos DirectCall, Nvoip, WaVoIP
+e Twilio, além da gravação local. Credenciais reais nunca ficam nesta pasta:
+entram pelo `.env`, que é ignorado pelo Git, e os arquivos finais são gerados
+dentro do container.
 
 ## Subir e validar
 
@@ -38,6 +39,9 @@ estruturados sem incluir senha ou número de telefone.
 ## Rede e segurança
 
 - SIP DirectCall: UDP 5060.
+- O canal Nvoip usa o prefixo interno `*7`, registra por usuário e senha em
+  `app.nvoip.com.br` e envia números brasileiros no formato `55...`.
+- O canal WaVoIP usa o prefixo interno `*8`.
 - O canal Twilio usa o prefixo interno `*9`, envia E.164 com `+` e autentica
   pelo IP ACL da VPS; por isso nao aparece em `pjsip show registrations`.
 - A rota Twilio guarda o ramal WebRTC em `OMNI_ORIGIN_EXTENSION` antes de trocar
