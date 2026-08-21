@@ -190,6 +190,18 @@ export interface TelephonyOverview {
   recordings: CallRecording[];
 }
 
+export interface WhatsAppVoiceStatus {
+  webhookConfigured: boolean;
+  connected: boolean | null;
+  deviceStatus: string | null;
+  lastEventAt: string | null;
+  sessionId: number | null;
+  restriction: {
+    type: string;
+    expiresAt: string | null;
+  } | null;
+}
+
 export interface TelephonyFilters {
   date?: string;
   userId?: string;
@@ -391,6 +403,10 @@ export const api = {
 
   telephonyOverview(accessToken: string): Promise<TelephonyOverview> {
     return request("/telephony/overview", { headers: auth(accessToken) });
+  },
+
+  whatsAppVoiceStatus(accessToken: string): Promise<WhatsAppVoiceStatus> {
+    return request("/whatsapp/voice/status", { headers: auth(accessToken) });
   },
 
   telephonyCalls(

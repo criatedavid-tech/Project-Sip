@@ -1,11 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { callStatus, durationSeconds, recordingStatus } from "./call-event-store";
+import {
+  callStatus,
+  durationSeconds,
+  eventTimestamp,
+  recordingStatus,
+} from "./call-event-store";
 
 describe("normalização dos eventos de chamada", () => {
   it("converte a duração do Asterisk para segundos", () => {
     expect(durationSeconds("1501")).toBe(2);
     expect(durationSeconds("0")).toBe(0);
     expect(durationSeconds(undefined)).toBeNull();
+  });
+
+  it("preserva os instantes reais enviados pelo PABX", () => {
+    expect(eventTimestamp("1787331600000")?.toISOString()).toBe(
+      "2026-08-21T17:00:00.000Z",
+    );
+    expect(eventTimestamp("inválido")).toBeNull();
   });
 
   it("traduz os estados do Dial para o histórico", () => {

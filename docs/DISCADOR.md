@@ -7,9 +7,9 @@ navegador, consultar contatos e trabalhar listas de campanhas. Ele reutiliza o
 ramal WebRTC individual já registrado no Asterisk e os troncos SIP configurados
 na plataforma.
 
-Nesta fase, toda a implementação e validação devem acontecer no ambiente local.
-O deploy para a VPS só deve ser feito depois que migrações, testes, fluxo de
-ligação e permissões forem aprovados localmente.
+Toda implementação e validação acontecem no ambiente local. Não existe VPS
+ativa; qualquer futura publicação exige nova autorização, revisão de segurança
+e aprovação de migrações, chamadas e permissões.
 
 ## Escopo implementado
 
@@ -19,7 +19,7 @@ ligação e permissões forem aprovados localmente.
 - envio de DTMF durante a chamada;
 - ativação e desativação do microfone;
 - colocação da chamada em espera e retomada;
-- seleção de DirectCall, Twilio ou WaVoIP;
+- seleção entre telefonia SIP e voz pelo WhatsApp;
 - cadastro e listagem de contatos;
 - criação de campanhas por administradores e supervisores;
 - ativação, pausa e conclusão de campanhas;
@@ -95,7 +95,7 @@ Pré-requisitos: Node.js, pnpm, Docker Desktop, microfone autorizado no navegado
 e um `.env` local preenchido sem expor credenciais.
 
 ```powershell
-cd C:\Users\Criate\Documents\Codex\omni-platform
+cd {{diretorio_local}}\omni-platform
 pnpm install
 docker compose --env-file .env -f infra/docker-compose.yml up -d postgres redis asterisk whisper
 pnpm --filter @omni/db db:migrate
@@ -156,7 +156,7 @@ estiverem concluídos.
   mas chamadas para a rede telefônica pública ainda precisam de um tronco SIP,
   DID ou operadora licenciada.
 - Limites, destinos, identificação de chamada e custos dependem do contrato com
-  DirectCall, Twilio ou WaVoIP.
+  o provedor de telefonia contratado.
 - Campanhas de chamadas devem respeitar consentimento, bloqueios, horários,
   política interna e requisitos aplicáveis da LGPD.
 

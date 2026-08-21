@@ -1,137 +1,82 @@
-# Pendencias urgentes de operacao
+# Pendências urgentes de operação
 
-Este documento descreve as acoes que devem ser concluidas antes de considerar a
-plataforma pronta para uso diario. Nao contem credenciais nem substitui backup.
+## Estado vigente
 
-## 1. Estado do ambiente
+O projeto está somente no ambiente local. Não existe VPS, aplicação pública ou
+infraestrutura em nuvem ativa. A versão do repositório e o banco local são a
+fonte de verdade.
 
-- A aplicacao esta publicada em uma VPS Oracle de homologacao.
-- HTTPS, WSS, ramais WebRTC, DirectCall, WaVoIP e a saida Twilio estao
-  operacionais.
-- O audio bidirecional foi validado apos habilitar ICE/STUN, RTP simetrico e
-  `rtp_keepalive`.
-- A VPS atual usa uma shape sustentada pelos creditos do Free Trial e nao deve
-  continuar ativa depois do fim da avaliacao.
-- Chamadas telefonicas sao gravadas e transcritas.
-- A chamada Twilio para destino verificado, a gravacao e a transcricao foram
-  validadas. A correcao de atribuicao ao ramal ainda precisa ser publicada na
-  VPS e validada com uma nova chamada.
-- Tentativas canceladas ou nao atendidas aparecem como `Sem gravacao`, sem
-  falso erro. Uma chamada WaVoIP atendida ainda precisa de revalidacao final do
-  arquivo e da transcricao.
-- A entrada pelo DID DirectCall ainda nao foi validada de ponta a ponta.
+Não faça deploy, não crie recursos pagos e não exponha portas locais sem nova
+autorização explícita.
 
-## 2. Migracao para Oracle Always Free
+## 1. Validar chamadas reais
 
-A fonte Terraform revisavel esta em `infra/oci-free-stack`. Ela solicita uma
-`VM.Standard.A1.Flex` ARM com 1 OCPU e 4 GB. Nao substitua a shape por E5, A2 ou
-outra opcao sem confirmar explicitamente custo zero.
+Executar novos testes controlados para cada canal configurado:
 
-Ordem segura de migracao:
+1. chamada de saída;
+2. chamada recebida e encaminhada para a fila;
+3. áudio bidirecional;
+4. atribuição ao colaborador e ramal corretos;
+5. duração e tempo até atendimento;
+6. gravação reproduzível;
+7. transcrição concluída;
+8. encerramento sem canais presos.
 
-1. Registrar a data de encerramento do Free Trial e criar um lembrete anterior.
-2. Gerar backup do PostgreSQL, das gravacoes e dos arquivos de configuracao.
-3. Criar a A1 mantendo a VPS atual ativa.
-4. Instalar Docker e clonar o repositorio na nova instancia.
-5. Transferir o `.env` por canal seguro, sem adiciona-lo ao Git.
-6. Restaurar banco e gravacoes.
-7. Subir os containers e validar saude, login, ramal, DirectCall e WaVoIP.
-8. Validar audio, gravacao e transcricao com chamada real.
-9. Trocar DNS e configuracoes dos provedores para o novo IPv4.
-10. Manter a VPS antiga apenas durante a janela de retorno definida.
-11. Depois da validacao e de um novo backup, encerrar a VPS antiga antes que
-    ela possa gerar cobranca.
+Não use números de clientes nos testes. Utilize contatos de homologação
+autorizados e confirme eventuais custos antes da ligação.
 
-Se a OCI responder `Out of host capacity`, nao crie uma shape paga como
-alternativa automatica. Preserve os backups e tente a A1 novamente depois.
+## 2. Eventos de voz pelo WhatsApp
 
-## 3. Validacao de chamada recebida DirectCall
+Para validar eventos reais:
 
-O teste somente e aprovado quando uma chamada externa percorre todo o fluxo:
+1. definir `WHATSAPP_VOICE_WEBHOOK_TOKEN` com 32 ou mais caracteres aleatórios;
+2. confirmar o número da conta em `whatsapp_accounts` ou definir, apenas no
+   ambiente local de organização única, `WHATSAPP_VOICE_ORGANIZATION_ID`;
+3. abrir um túnel HTTPS temporário e restrito para a API local;
+4. cadastrar a URL `/webhooks/whatsapp/voice?token={{token}}` no provedor;
+5. testar conexão, restrição temporária, chamada e gravação;
+6. encerrar o túnel imediatamente após o teste.
 
-1. O numero DirectCall recebe a chamada.
-2. O `INVITE` chega ao Asterisk.
-3. A fila `vendas` chama um ramal WebRTC.
-4. O atendente atende e ambos os lados ouvem audio.
-5. O colaborador correto aparece no historico.
-6. O WAV e criado e pode ser reproduzido.
-7. A transcricao termina sem intervencao manual.
+O webhook não cria chamadas sintéticas. Eventos sem correspondência segura
+ficam apenas na auditoria.
 
-Durante o teste, acompanhar o logger PJSIP, o console do Asterisk e os logs do
-worker de telefonia. Nao publicar credenciais nos logs compartilhados.
+## 3. Métricas ainda incompletas
 
-## 4. Gravacao WaVoIP
+O Asterisk registra início, atendimento e encerramento. Ainda falta persistir o
+fim do pós-atendimento. Até existir um evento confiável, `wrap_up_time` e o
+tempo médio de atendimento dependente desse campo permanecem como
+`Não disponível`.
 
-A chamada WaVoIP foi validada com terceiros: o `MixMonitor` gerou arquivo nao
-vazio, a API conseguiu reproduzi-lo e o worker enviou o audio ao Whisper. Uma
-transcricao pode ficar vazia quando o arquivo nao contem fala detectavel.
+Não preencher esses valores com zero nem estimar a partir da duração da chamada.
 
-Verificar, nessa ordem:
+## 4. Gravações e privacidade
 
-1. canal real criado pelo dialplan WaVoIP;
-2. inicio e encerramento do `MixMonitor`;
-3. caminho e permissoes do volume de gravacoes;
-4. evento ARI de gravacao concluida;
-5. vinculacao entre `call_id` e arquivo;
-6. envio do arquivo ao Whisper.
+Antes de uso diário com dados reais:
 
-## 5. Atribuicao das chamadas Twilio
+- migrar os arquivos para storage em objeto;
+- definir retenção e descarte;
+- registrar reprodução, download e exportação;
+- documentar base legal, finalidade e consentimento;
+- testar restauração de backup;
+- impedir acesso direto aos arquivos fora da API autenticada.
 
-A Twilio substitui o Caller ID SIP pelo numero verificado antes de enviar a
-chamada externa. Sem preservar o valor anterior, o evento ARI recebe o telefone
-externo no campo de ramal e a interface mostra `Nao atribuida`.
+## 5. Segurança operacional
 
-O dialplan corrigido executa estes passos:
+- preservar Row Level Security e o escopo próprio do atendente;
+- manter banco, cache, storage, ARI e transcrição fora da internet pública;
+- nunca versionar `.env`, tokens, senhas, áudios ou dados pessoais;
+- trocar credenciais antes de qualquer futura publicação;
+- validar logs para evitar telefone, token ou payload sensível;
+- adicionar monitoramento de disco, filas, troncos e transcrições.
 
-1. salva o `CALLERID(num)` original em `OMNI_ORIGIN_EXTENSION`;
-2. aplica `TWILIO_CALLER_ID` para a chamada externa;
-3. envia `OMNI_ORIGIN_EXTENSION` ao subprograma `record-and-dial`;
-4. o worker localiza o ramal em `telephony_extensions` e vincula usuario e
-   organizacao.
+## 6. Antes de uma futura publicação
 
-Depois do deploy, fazer uma nova chamada Twilio e confirmar historico,
-gravacao, transcricao, colaborador e ramal. Registros anteriores nao sao
-reprocessados automaticamente. A conta Trial continua limitada a destinos
-verificados; recebimento exige numero Twilio e Origination URI.
+Uma publicação só pode começar depois de autorização explícita e deve incluir:
 
-## 6. Backup minimo
-
-O backup deve conter, de forma criptografada:
-
-- dump consistente do PostgreSQL;
-- volume ou objeto das gravacoes;
-- lista de versoes e imagens dos containers;
-- configuracoes sem segredos no Git;
-- segredos em cofre ou arquivo protegido separado.
-
-Uma copia nao e considerada backup ate que uma restauracao de teste seja
-concluida em ambiente separado.
-
-### Backup automatizado na VPS
-
-O script `infra/scripts/backup.sh` gera um dump consistente do PostgreSQL e um
-arquivo compactado das gravacoes. Tambem grava checksums SHA-256, restringe as
-permissoes e remove copias locais com mais de 14 dias.
-
-Instalacao na VPS:
-
-```bash
-sudo install -m 0755 infra/scripts/backup.sh /home/opc/project-sip/infra/scripts/backup.sh
-sudo install -m 0644 infra/systemd/project-sip-backup.service /etc/systemd/system/
-sudo install -m 0644 infra/systemd/project-sip-backup.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now project-sip-backup.timer
-sudo systemctl start project-sip-backup.service
-sudo systemctl status project-sip-backup.service --no-pager
-```
-
-As copias ficam em `/var/backups/project-sip`, acessiveis apenas pelo `root`.
-Para protecao contra perda da VPS, ainda e obrigatorio enviar periodicamente uma
-copia criptografada para outro local e testar a restauracao.
-
-## 7. Exposicao de servicos internos
-
-PostgreSQL, Redis e MinIO devem ser publicados somente em `127.0.0.1`. O acesso
-externo direto a esses servicos nao e necessario para a aplicacao e amplia a
-superficie de ataque. A interface publica deve permanecer restrita ao proxy
-HTTPS e as portas SIP/RTP estritamente necessarias.
+1. orçamento aprovado;
+2. arquitetura e superfície de rede revisadas;
+3. backup e restauração testados;
+4. segredos gerenciados fora do repositório;
+5. HTTPS/WSS e firewall restritivo;
+6. testes de entrada, saída e concorrência;
+7. plano de reversão e encerramento de custos.

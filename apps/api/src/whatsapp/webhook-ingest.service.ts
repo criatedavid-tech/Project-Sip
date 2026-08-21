@@ -25,8 +25,10 @@ export class WebhookIngestService {
     payload: unknown;
     signatureValid: boolean;
     eventType?: string;
+    providerEventId?: string;
   }): Promise<IngestResult> {
-    const providerEventId = this.deriveEventId(params.payload);
+    const providerEventId =
+      params.providerEventId?.trim() || this.deriveEventId(params.payload);
 
     const rows = await this.db
       .insert(schema.webhookDeliveries)
@@ -56,6 +58,16 @@ export class WebhookIngestService {
     await this.db
       .update(schema.webhookDeliveries)
       .set({ status: "processed", processedAt: new Date() })
+      .where(sql`id = ${deliveryId}`);
+  }
+
+  async assignOrganization(
+    deliveryId: string,
+    organizationId: string,
+  ): Promise<void> {
+    await this.db
+      .update(schema.webhookDeliveries)
+      .set({ organizationId, updatedAt: new Date() })
       .where(sql`id = ${deliveryId}`);
   }
 

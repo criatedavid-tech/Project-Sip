@@ -20,6 +20,14 @@ export function durationSeconds(value: string | undefined): number | null {
   return Math.ceil(milliseconds / 1_000);
 }
 
+export function eventTimestamp(value: string | undefined): Date | null {
+  if (!value) return null;
+  const milliseconds = Number.parseInt(value, 10);
+  if (!Number.isFinite(milliseconds) || milliseconds <= 0) return null;
+  const date = new Date(milliseconds);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
 export function callStatus(
   dialStatus: string | undefined,
   callDurationSeconds?: number | null,
@@ -113,15 +121,16 @@ export class CallEventStore {
       return null;
     }
 
-    const endedAt = new Date();
+    const endedAt = eventTimestamp(event.endedAtMs) ?? new Date();
     const seconds = durationSeconds(event.durationMs);
-    const inferredStart = new Date(
+    const fallbackStart = new Date(
       endedAt.getTime() - (seconds === null ? 0 : seconds * 1_000),
     );
+    const startedAt = eventTimestamp(event.startedAtMs) ?? fallbackStart;
     const callId = await this.ensureCall(
       event,
       callOwner,
-      event.stage === "started" ? endedAt : inferredStart,
+      startedAt,
     );
 
     if (event.stage === "started") {
@@ -140,7 +149,8 @@ export class CallEventStore {
         status,
         answeredAt:
           status === "completed" && seconds !== null
-            ? new Date(endedAt.getTime() - seconds * 1_000)
+            ? eventTimestamp(event.answeredAtMs) ??
+              new Date(endedAt.getTime() - seconds * 1_000)
             : null,
         endedAt,
         durationSeconds: seconds,

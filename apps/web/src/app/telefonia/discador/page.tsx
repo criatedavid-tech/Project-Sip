@@ -27,7 +27,7 @@ const KEYS = [
 const PROVIDERS: Array<{ value: VoiceProvider; label: string }> = [
   { value: "twilio", label: "Telefone — Twilio" },
   { value: "directcall", label: "Telefone — DirectCall" },
-  { value: "wavoip", label: "WhatsApp — WaVoIP" },
+  { value: "wavoip", label: "Voz pelo WhatsApp" },
 ];
 
 const DISPOSITIONS = [
