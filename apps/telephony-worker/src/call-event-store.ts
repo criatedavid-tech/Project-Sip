@@ -20,6 +20,14 @@ export function durationSeconds(value: string | undefined): number | null {
   return Math.ceil(milliseconds / 1_000);
 }
 
+export function eventTimestamp(value: string | undefined): Date | null {
+  if (!value) return null;
+  const milliseconds = Number.parseInt(value, 10);
+  if (!Number.isFinite(milliseconds) || milliseconds <= 0) return null;
+  const date = new Date(milliseconds);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
 export function callStatus(
   dialStatus: string | undefined,
   callDurationSeconds?: number | null,
@@ -43,6 +51,14 @@ export function callStatus(
     default:
       return "failed";
   }
+}
+
+export function recordingStatus(
+  normalizedCallStatus: string,
+  fileAvailable: boolean,
+): "available" | "failed" | "not_recorded" {
+  if (normalizedCallStatus !== "completed") return "not_recorded";
+  return fileAvailable ? "available" : "failed";
 }
 
 export class CallEventStore {
@@ -105,15 +121,16 @@ export class CallEventStore {
       return null;
     }
 
-    const endedAt = new Date();
+    const endedAt = eventTimestamp(event.endedAtMs) ?? new Date();
     const seconds = durationSeconds(event.durationMs);
-    const inferredStart = new Date(
+    const fallbackStart = new Date(
       endedAt.getTime() - (seconds === null ? 0 : seconds * 1_000),
     );
+    const startedAt = eventTimestamp(event.startedAtMs) ?? fallbackStart;
     const callId = await this.ensureCall(
       event,
       callOwner,
-      event.stage === "started" ? endedAt : inferredStart,
+      startedAt,
     );
 
     if (event.stage === "started") {
@@ -132,7 +149,8 @@ export class CallEventStore {
         status,
         answeredAt:
           status === "completed" && seconds !== null
-            ? new Date(endedAt.getTime() - seconds * 1_000)
+            ? eventTimestamp(event.answeredAtMs) ??
+              new Date(endedAt.getTime() - seconds * 1_000)
             : null,
         endedAt,
         durationSeconds: seconds,
@@ -149,11 +167,12 @@ export class CallEventStore {
     const recordingFile = this.recordingFile(event.recordingId);
     const file = await stat(recordingFile).catch(() => null);
     const available = Boolean(file?.isFile() && file.size > 44);
+    const normalizedRecordingStatus = recordingStatus(status, available);
 
     await this.db
       .update(schema.callRecordings)
       .set({
-        status: available ? "available" : "failed",
+        status: normalizedRecordingStatus,
         sizeBytes: file?.size ?? null,
         durationSeconds: seconds,
         availableAt: available ? endedAt : null,
@@ -172,6 +191,7 @@ export class CallEventStore {
         recordingId: event.recordingId,
         status,
         recordingAvailable: available,
+        recordingStatus: normalizedRecordingStatus,
       },
       "chamada e gravação persistidas",
     );

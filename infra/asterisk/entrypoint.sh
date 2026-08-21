@@ -9,6 +9,11 @@ WAVOIP_SIP_HOST
 WAVOIP_SIP_USERNAME
 WAVOIP_SIP_PASSWORD
 WAVOIP_CALLER_ID
+TWILIO_SIP_DOMAIN
+TWILIO_CALLER_ID
+NVOIP_SIP_HOST
+NVOIP_SIP_USERNAME
+NVOIP_SIP_PASSWORD
 ASTERISK_ARI_USERNAME
 ASTERISK_ARI_PASSWORD
 ASTERISK_WEBRTC_1001_PASSWORD
@@ -27,9 +32,14 @@ export SIP_SUPPORTED_CODECS="${SIP_SUPPORTED_CODECS:-alaw,ulaw}"
 export SIP_PHONE_NUMBER="${SIP_PHONE_NUMBER:-${SIP_USERNAME}}"
 export WAVOIP_SIP_PORT="${WAVOIP_SIP_PORT:-5060}"
 export WAVOIP_SUPPORTED_CODECS="${WAVOIP_SUPPORTED_CODECS:-alaw,ulaw}"
+export TWILIO_SUPPORTED_CODECS="${TWILIO_SUPPORTED_CODECS:-ulaw,alaw}"
+export NVOIP_SIP_PORT="${NVOIP_SIP_PORT:-5060}"
+export NVOIP_CALLER_ID="${NVOIP_CALLER_ID:-${NVOIP_SIP_USERNAME}}"
+export NVOIP_SUPPORTED_CODECS="${NVOIP_SUPPORTED_CODECS:-alaw,ulaw}"
 export ASTERISK_ARI_APP="${ASTERISK_ARI_APP:-omnichannel}"
 export ASTERISK_RTP_START="${ASTERISK_RTP_START:-10000}"
 export ASTERISK_RTP_END="${ASTERISK_RTP_END:-10099}"
+export ASTERISK_STUN_ADDRESS="${ASTERISK_STUN_ADDRESS:-stun.l.google.com:19302}"
 export ASTERISK_EXTENSION_START="${ASTERISK_EXTENSION_START:-1001}"
 export ASTERISK_EXTENSION_END="${ASTERISK_EXTENSION_END:-1099}"
 export ASTERISK_QUEUE_NAME="${ASTERISK_QUEUE_NAME:-vendas}"
@@ -105,9 +115,9 @@ password = $extension_password
 type = aor
 max_contacts = 1
 remove_existing = yes
-# O navegador WebRTC mantem o transporte WebSocket ativo. O qualify por SIP
-# OPTIONS pode marcar clientes SIP.js registrados como indisponiveis, gerando
-# um falso "Offline" no ARI. Zero preserva o estado pelo registro do contato.
+; O navegador WebRTC mantem o transporte WebSocket ativo. O qualify por SIP
+; OPTIONS pode marcar clientes SIP.js registrados como indisponiveis, gerando
+; um falso "Offline" no ARI. Zero preserva o estado pelo registro do contato.
 qualify_frequency = 0
 
 [$extension]
@@ -120,6 +130,10 @@ aors = $extension
 auth = $extension-auth
 webrtc = yes
 direct_media = no
+force_rport = yes
+rewrite_contact = yes
+rtp_symmetric = yes
+rtp_keepalive = 20
 dtmf_mode = rfc4733
 EOF
   printf 'member => PJSIP/%s,%s\n' "$extension" "$extension" >> /etc/asterisk/queues.conf
@@ -136,7 +150,7 @@ if [ -z "${ASTERISK_EXTERNAL_ADDRESS:-}" ]; then
     /etc/asterisk/pjsip.conf
 fi
 
-envsubst '${ASTERISK_QUEUE_NAME} ${ASTERISK_QUEUE_MAX_WAIT} ${SIP_USERNAME} ${SIP_PHONE_NUMBER}' \
+envsubst '${ASTERISK_QUEUE_NAME} ${ASTERISK_QUEUE_MAX_WAIT} ${SIP_USERNAME} ${SIP_PHONE_NUMBER} ${TWILIO_CALLER_ID}' \
   < /opt/omni-asterisk/config/extensions.conf \
   > /etc/asterisk/extensions.conf
 chown asterisk:asterisk /etc/asterisk/extensions.conf

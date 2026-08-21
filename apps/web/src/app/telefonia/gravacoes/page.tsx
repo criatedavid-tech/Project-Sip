@@ -177,6 +177,7 @@ export default function RecordingsPage() {
               <option value="">Todos</option>
               <option value="directcall">Telefone</option>
               <option value="wavoip">WhatsApp</option>
+              <option value="twilio">Telefone (Twilio)</option>
               <option value="internal">Interna</option>
             </select>
           </label>
@@ -186,6 +187,7 @@ export default function RecordingsPage() {
               <option value="">Todos</option>
               <option value="available">Disponível</option>
               <option value="processing">Processando</option>
+              <option value="not_recorded">Sem gravação</option>
               <option value="failed">Falhou</option>
             </select>
           </label>
@@ -238,7 +240,13 @@ export default function RecordingsPage() {
                             : styles.statusNeutral
                       }`}
                     >
-                      {recording.status === "available" ? "Disponível" : recording.status}
+                      {recording.status === "available"
+                        ? "Disponível"
+                        : recording.status === "not_recorded"
+                          ? "Sem gravação"
+                          : recording.status === "failed"
+                            ? "Falhou"
+                            : recording.status}
                     </span>
                     {recording.status === "available" ? (
                       <button

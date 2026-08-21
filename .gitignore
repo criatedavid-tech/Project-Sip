@@ -26,3 +26,6 @@ Thumbs.db
 secrets/
 *.pem
 *.key
+
+# Pacote gerado localmente a partir do Terraform da OCI.
+/infra/project-sip-oci-free-stack.zip

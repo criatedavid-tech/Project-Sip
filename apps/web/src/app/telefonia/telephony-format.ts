@@ -50,6 +50,8 @@ export function formatTimestamp(milliseconds: number) {
 export function providerLabel(provider: string) {
   if (provider === "wavoip") return "WhatsApp";
   if (provider === "directcall") return "Telefone";
+  if (provider === "twilio") return "Telefone (Twilio)";
+  if (provider === "nvoip") return "Telefone (Nvoip)";
   if (provider === "internal") return "Interna";
   return "Não identificado";
 }

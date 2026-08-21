@@ -31,6 +31,9 @@ export interface RecordingLifecycleEvent {
   extension?: string;
   dialStatus?: string;
   durationMs?: string;
+  startedAtMs?: string;
+  answeredAtMs?: string;
+  endedAtMs?: string;
 }
 
 export type RecordingLifecycleHandler = (
@@ -281,6 +284,9 @@ export class AriMonitor {
     const provider = textValue(variables.Provider);
     const dialStatus = textValue(variables.DialStatus);
     const durationMs = textValue(variables.DurationMs);
+    const startedAtMs = textValue(variables.StartedAtMs);
+    const answeredAtMs = textValue(variables.AnsweredAtMs);
+    const endedAtMs = textValue(variables.EndedAtMs);
     const callId = textValue(variables.CallId);
     const linkedId = textValue(variables.LinkedId);
     const fromNumber = textValue(variables.FromNumber);
@@ -296,6 +302,9 @@ export class AriMonitor {
         provider,
         dialStatus,
         durationMs,
+        startedAtMs,
+        answeredAtMs,
+        endedAtMs,
         callId,
         linkedId,
         fromNumber,
@@ -318,6 +327,9 @@ export class AriMonitor {
       extension,
       dialStatus,
       durationMs,
+      startedAtMs,
+      answeredAtMs,
+      endedAtMs,
     };
     this.recordingEventQueue = this.recordingEventQueue
       .then(() => this.recordingEventHandler(lifecycleEvent))

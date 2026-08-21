@@ -1,0 +1,11 @@
+[Unit]
+Description=Agenda o backup diario do Project SIP
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=project-sip-backup.service
+
+[Install]
+WantedBy=timers.target

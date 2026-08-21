@@ -8,6 +8,7 @@ import styles from "./app-header.module.css";
 const NAVIGATION = [
   { href: "/inbox", label: "Conversas" },
   { href: "/telefonia", label: "Telefonia" },
+  { href: "/telefonia/discador", label: "Discador" },
   { href: "/telefonia/ligacoes", label: "Ligações" },
   { href: "/telefonia/gravacoes", label: "Gravações" },
   { href: "/telefonia/admin", label: "Painel admin", adminOnly: true },

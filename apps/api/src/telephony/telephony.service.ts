@@ -6,12 +6,23 @@ import { resolve, sep } from "node:path";
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { and, desc, eq, gte, isNull, lt, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  type SQL,
+} from "drizzle-orm";
 import { z } from "zod";
 import { hashPassword, ROLES } from "@omni/auth";
 import { loadTelephonyEnv } from "@omni/config";
@@ -37,6 +48,16 @@ const telephonyFiltersSchema = z.object({
   userId: z.string().uuid().optional(),
   provider: z.string().regex(/^[a-z0-9_-]{1,40}$/i).optional(),
   status: z.string().regex(/^[a-z0-9_-]{1,40}$/i).optional(),
+  direction: z.enum(["inbound", "outbound"]).optional(),
+});
+const dashboardFiltersSchema = z.object({
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  direction: z.enum(["inbound", "outbound"]).optional(),
+  userId: z.string().uuid().optional(),
+  provider: z.string().regex(/^[a-z0-9_-]{1,40}$/i).optional(),
+  status: z.string().regex(/^[a-z0-9_-]{1,40}$/i).optional(),
+  granularity: z.enum(["hour", "day", "week", "month"]).default("day"),
 });
 const createCollaboratorSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -46,17 +67,213 @@ const createCollaboratorSchema = z.object({
   extension: z.string().regex(/^\d{4}$/).optional(),
 });
 const collaboratorStatusSchema = z.object({ active: z.boolean() });
+const createDialerContactSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  phoneNumber: z.string().trim().min(10).max(30),
+  email: z.string().trim().toLowerCase().email().max(254).optional().or(z.literal("")),
+  company: z.string().trim().max(120).optional(),
+  notes: z.string().trim().max(2_000).optional(),
+});
+const createCampaignSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  provider: z.enum(["directcall", "wavoip", "twilio"]).default("twilio"),
+  contactIds: z.array(z.string().uuid()).min(1).max(5_000),
+});
+const campaignStatusSchema = z.object({
+  status: z.enum(["draft", "active", "paused", "completed"]),
+});
+const campaignItemResultSchema = z.object({
+  status: z.enum(["completed", "failed", "skipped"]),
+  disposition: z.enum([
+    "answered",
+    "no_answer",
+    "busy",
+    "invalid",
+    "callback",
+    "sale",
+    "not_interested",
+  ]),
+  notes: z.string().trim().max(2_000).optional(),
+});
+
+export function normalizeDialerPhone(value: string): string | null {
+  let digits = value.replace(/\D/g, "");
+  if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
+  return /^55[1-9]\d(?:[2-9]\d{7}|9\d{8})$/.test(digits) ? digits : null;
+}
 
 export interface TelephonyFilters {
   date?: string;
   userId?: string;
   provider?: string;
   status?: string;
+  direction?: "inbound" | "outbound";
 }
 
 interface ParsedTelephonyFilters extends TelephonyFilters {
   start?: Date;
   end?: Date;
+  recordingStatus?: string;
+}
+
+export interface DashboardCallMetricInput {
+  status: string;
+  direction: string;
+  startedAt: Date | string;
+  durationSeconds: number | null;
+  answerTimeSeconds: number | null;
+  wrapUpTimeSeconds: number | null;
+}
+
+export type DashboardGranularity = "hour" | "day" | "week" | "month";
+
+export function callTiming(input: {
+  startedAt: Date | string;
+  answeredAt: Date | string | null;
+}) {
+  if (!input.answeredAt) {
+    return { answerTimeSeconds: null, wrapUpTimeSeconds: null };
+  }
+  const startedAt = new Date(input.startedAt).getTime();
+  const answeredAt = new Date(input.answeredAt).getTime();
+  return {
+    answerTimeSeconds:
+      Number.isFinite(startedAt) && Number.isFinite(answeredAt)
+        ? Math.max(0, Math.round((answeredAt - startedAt) / 1_000))
+        : null,
+    // O banco ainda não registra o instante de fim do pós-atendimento.
+    wrapUpTimeSeconds: null,
+  };
+}
+
+export function buildDashboardMetrics(calls: DashboardCallMetricInput[]) {
+  const durations = calls.flatMap((call) =>
+    call.durationSeconds === null ? [] : [call.durationSeconds],
+  );
+  const handleTimes = calls.flatMap((call) =>
+    call.durationSeconds === null || call.wrapUpTimeSeconds === null
+      ? []
+      : [call.durationSeconds + call.wrapUpTimeSeconds],
+  );
+  const totalConversationSeconds = durations.reduce(
+    (total, duration) => total + duration,
+    0,
+  );
+  return {
+    averageHandleTimeSeconds:
+      handleTimes.length === 0
+        ? null
+        : Math.round(
+            handleTimes.reduce((total, duration) => total + duration, 0) /
+              handleTimes.length,
+          ),
+    totalCalls: calls.length,
+    totalConversationSeconds,
+    averageConversationSeconds:
+      durations.length === 0
+        ? null
+        : Math.round(totalConversationSeconds / durations.length),
+    completedCalls: calls.filter((call) => call.status === "completed").length,
+    failedCalls: calls.filter((call) =>
+      ["failed", "busy", "no_answer", "cancelled"].includes(call.status),
+    ).length,
+  };
+}
+
+const saoPauloParts = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  hourCycle: "h23",
+});
+
+function dashboardBucket(
+  value: Date | string,
+  granularity: DashboardGranularity,
+) {
+  const parts = Object.fromEntries(
+    saoPauloParts
+      .formatToParts(new Date(value))
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  const day = `${parts.year}-${parts.month}-${parts.day}`;
+  if (granularity === "hour") {
+    return { key: `${day}T${parts.hour}`, label: `${parts.hour}h` };
+  }
+  if (granularity === "day") {
+    return { key: day, label: `${parts.day}/${parts.month}` };
+  }
+  if (granularity === "month") {
+    return { key: `${parts.year}-${parts.month}`, label: `${parts.month}/${parts.year}` };
+  }
+  const date = new Date(
+    Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)),
+  );
+  const daysSinceMonday = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - daysSinceMonday);
+  const weekYear = date.getUTCFullYear();
+  const weekMonth = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const weekDay = String(date.getUTCDate()).padStart(2, "0");
+  return {
+    key: `${weekYear}-${weekMonth}-${weekDay}`,
+    label: `Sem. ${weekDay}/${weekMonth}`,
+  };
+}
+
+export function buildDashboardSeries(
+  calls: DashboardCallMetricInput[],
+  granularity: DashboardGranularity,
+) {
+  const buckets = new Map<
+    string,
+    { key: string; label: string; inbound: number; outbound: number; total: number }
+  >();
+  for (const call of calls) {
+    const bucket = dashboardBucket(call.startedAt, granularity);
+    const current = buckets.get(bucket.key) ?? {
+      ...bucket,
+      inbound: 0,
+      outbound: 0,
+      total: 0,
+    };
+    current.total += 1;
+    if (call.direction === "inbound") current.inbound += 1;
+    if (call.direction === "outbound") current.outbound += 1;
+    buckets.set(bucket.key, current);
+  }
+  return [...buckets.values()].sort((left, right) =>
+    left.key.localeCompare(right.key),
+  );
+}
+
+export function parseDashboardFilters(input: Record<string, unknown>) {
+  const parsed = dashboardFiltersSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new BadRequestException("filtros do dashboard inválidos");
+  }
+  const start = new Date(`${parsed.data.startDate}T00:00:00-03:00`);
+  const endInclusive = new Date(`${parsed.data.endDate}T00:00:00-03:00`);
+  const end = new Date(endInclusive.getTime() + 24 * 60 * 60 * 1_000);
+  if (
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(endInclusive.getTime()) ||
+    start > endInclusive ||
+    end.getTime() - start.getTime() > 366 * 24 * 60 * 60 * 1_000
+  ) {
+    throw new BadRequestException("período do dashboard inválido");
+  }
+  const normalizedStart = saoPauloParts.format(start).slice(0, 10);
+  const normalizedEnd = saoPauloParts.format(endInclusive).slice(0, 10);
+  if (
+    normalizedStart !== parsed.data.startDate ||
+    normalizedEnd !== parsed.data.endDate
+  ) {
+    throw new BadRequestException("período do dashboard inválido");
+  }
+  return { ...parsed.data, start, end };
 }
 
 export function scopedTelephonyUserId(
@@ -168,6 +385,7 @@ export function summarizeAri(input: {
   };
   const directcallStatus = trunkStatus("directcall");
   const wavoipStatus = trunkStatus("wavoip");
+  const twilioStatus = trunkStatus("twilio");
 
   return {
     available: true,
@@ -179,6 +397,7 @@ export function summarizeAri(input: {
     trunks: [
       { endpoint: "directcall", label: "DirectCall", status: directcallStatus },
       { endpoint: "wavoip", label: "WhatsApp", status: wavoipStatus },
+      { endpoint: "twilio", label: "Twilio", status: twilioStatus },
     ],
     endpointStates,
     activeChannels: channels.length,
@@ -254,6 +473,7 @@ export class TelephonyService {
         userId: scopedTelephonyUserId(user, filters.userId) ?? null,
         provider: filters.provider ?? null,
         status: filters.status ?? null,
+        direction: filters.direction ?? null,
       },
       items: database.calls,
     };
@@ -261,7 +481,11 @@ export class TelephonyService {
 
   async recordings(user: AuthenticatedUser, input: Record<string, unknown>) {
     const filters = parseTelephonyFilters(input);
-    const database = await this.databaseSnapshot(user, filters, 500);
+    const database = await this.databaseSnapshot(
+      user,
+      { ...filters, status: undefined, recordingStatus: filters.status },
+      500,
+    );
     return {
       scope: user.roleKey === ROLES.agent ? "own" : "organization",
       filters: {
@@ -269,6 +493,7 @@ export class TelephonyService {
         userId: scopedTelephonyUserId(user, filters.userId) ?? null,
         provider: filters.provider ?? null,
         status: filters.status ?? null,
+        direction: filters.direction ?? null,
       },
       items: database.recordings,
     };
@@ -339,6 +564,68 @@ export class TelephonyService {
     };
   }
 
+  async dashboardAdmin(
+    user: AuthenticatedUser,
+    input: Record<string, unknown>,
+  ) {
+    const filters = parseDashboardFilters(input);
+    const database = await this.databaseSnapshot(user, filters, 100_001);
+    const calls = database.calls.slice(0, 100_000);
+    const collaborators = database.team.map((member) => {
+      const memberCalls = calls.filter((call) => call.userId === member.userId);
+      const durations = memberCalls.flatMap((call) =>
+        call.durationSeconds === null ? [] : [call.durationSeconds],
+      );
+      const durationSeconds = durations.reduce(
+        (total, duration) => total + duration,
+        0,
+      );
+      return {
+        ...member,
+        calls: memberCalls.length,
+        completed: memberCalls.filter((call) => call.status === "completed").length,
+        failed: memberCalls.filter((call) =>
+          ["failed", "busy", "no_answer", "cancelled"].includes(call.status),
+        ).length,
+        durationSeconds,
+        averageDurationSeconds:
+          durations.length === 0
+            ? null
+            : Math.round(durationSeconds / durations.length),
+        recordings: memberCalls.filter((call) => call.recording !== null).length,
+        transcriptions: memberCalls.filter(
+          (call) => call.recording?.transcription?.status === "completed",
+        ).length,
+        lastCallAt: memberCalls[0]?.startedAt ?? null,
+      };
+    });
+
+    return {
+      scope: "organization" as const,
+      filters: {
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        direction: filters.direction ?? null,
+        userId: filters.userId ?? null,
+        provider: filters.provider ?? null,
+        status: filters.status ?? null,
+        granularity: filters.granularity,
+      },
+      metrics: buildDashboardMetrics(calls),
+      timeSeries: buildDashboardSeries(calls, filters.granularity),
+      team: database.team,
+      collaborators,
+      items: calls,
+      truncated: database.calls.length > calls.length,
+      unavailableFields: {
+        attemptStartedAt: false,
+        answeredAt: false,
+        endedAt: false,
+        wrapUpEndedAt: true,
+      },
+    };
+  }
+
   async collaborators(user: AuthenticatedUser) {
     return withOrganization(this.db, user.organizationId, async (tx) =>
       tx
@@ -378,6 +665,263 @@ export class TelephonyService {
           item.extensionStatus !== "inactive",
       })),
     }));
+  }
+
+  async dialerContacts(user: AuthenticatedUser) {
+    const items = await withOrganization(this.db, user.organizationId, async (tx) =>
+      tx
+        .select({
+          id: schema.contacts.id,
+          name: schema.contacts.name,
+          email: schema.contacts.email,
+          company: schema.contacts.company,
+          notes: schema.contacts.notes,
+          phoneNumber: schema.contactChannels.identifier,
+        })
+        .from(schema.contacts)
+        .innerJoin(
+          schema.contactChannels,
+          and(
+            eq(schema.contactChannels.contactId, schema.contacts.id),
+            eq(schema.contactChannels.channelType, "phone"),
+          ),
+        )
+        .orderBy(schema.contacts.name),
+    );
+    return { items };
+  }
+
+  async createDialerContact(user: AuthenticatedUser, input: Record<string, unknown>) {
+    const parsed = createDialerContactSchema.safeParse(input);
+    if (!parsed.success) throw new BadRequestException("dados do contato inválidos");
+    const phoneNumber = normalizeDialerPhone(parsed.data.phoneNumber);
+    if (!phoneNumber) throw new BadRequestException("telefone brasileiro inválido");
+
+    return withOrganization(this.db, user.organizationId, async (tx) => {
+      const [contact] = await tx
+        .insert(schema.contacts)
+        .values({
+          organizationId: user.organizationId,
+          name: parsed.data.name,
+          email: parsed.data.email || null,
+          company: parsed.data.company || null,
+          notes: parsed.data.notes || null,
+        })
+        .returning();
+      if (!contact) throw new ServiceUnavailableException("contato não foi criado");
+      try {
+        await tx.insert(schema.contactChannels).values({
+          organizationId: user.organizationId,
+          contactId: contact.id,
+          channelType: "phone",
+          identifier: phoneNumber,
+          isPrimary: "true",
+        });
+      } catch {
+        throw new ConflictException("telefone já cadastrado");
+      }
+      return { ...contact, phoneNumber };
+    });
+  }
+
+  async dialerCampaigns(user: AuthenticatedUser) {
+    return withOrganization(this.db, user.organizationId, async (tx) => {
+      const campaigns = await tx
+        .select()
+        .from(schema.dialerCampaigns)
+        .orderBy(desc(schema.dialerCampaigns.createdAt));
+      const items = campaigns.length
+        ? await tx
+            .select({
+              campaignId: schema.dialerCampaignItems.campaignId,
+              status: schema.dialerCampaignItems.status,
+              assignedUserId: schema.dialerCampaignItems.assignedUserId,
+            })
+            .from(schema.dialerCampaignItems)
+            .where(inArray(schema.dialerCampaignItems.campaignId, campaigns.map((item) => item.id)))
+        : [];
+      return {
+        items: campaigns.map((campaign) => {
+          const visible = items.filter(
+            (item) =>
+              item.campaignId === campaign.id &&
+              (user.roleKey !== ROLES.agent ||
+                item.assignedUserId === user.userId ||
+                item.status === "pending"),
+          );
+          return {
+            ...campaign,
+            metrics: {
+              total: visible.length,
+              pending: visible.filter((item) => item.status === "pending").length,
+              assigned: visible.filter((item) => item.status === "assigned").length,
+              completed: visible.filter((item) => item.status === "completed").length,
+              failed: visible.filter((item) => item.status === "failed").length,
+              skipped: visible.filter((item) => item.status === "skipped").length,
+            },
+          };
+        }),
+      };
+    });
+  }
+
+  async createDialerCampaign(user: AuthenticatedUser, input: Record<string, unknown>) {
+    if (user.roleKey === ROLES.agent) {
+      throw new ForbiddenException("somente supervisão pode criar campanhas");
+    }
+    const parsed = createCampaignSchema.safeParse(input);
+    if (!parsed.success) throw new BadRequestException("campanha inválida");
+
+    return withOrganization(this.db, user.organizationId, async (tx) => {
+      const contacts = await tx
+        .select({ id: schema.contacts.id, phoneNumber: schema.contactChannels.identifier })
+        .from(schema.contacts)
+        .innerJoin(
+          schema.contactChannels,
+          and(
+            eq(schema.contactChannels.contactId, schema.contacts.id),
+            eq(schema.contactChannels.channelType, "phone"),
+          ),
+        )
+        .where(inArray(schema.contacts.id, parsed.data.contactIds));
+      if (contacts.length !== new Set(parsed.data.contactIds).size) {
+        throw new BadRequestException("um ou mais contatos não possuem telefone");
+      }
+      const [campaign] = await tx
+        .insert(schema.dialerCampaigns)
+        .values({
+          organizationId: user.organizationId,
+          name: parsed.data.name,
+          provider: parsed.data.provider,
+          createdBy: user.userId,
+        })
+        .returning();
+      if (!campaign) throw new ServiceUnavailableException("campanha não foi criada");
+      await tx.insert(schema.dialerCampaignItems).values(
+        contacts.map((contact, index) => ({
+          organizationId: user.organizationId,
+          campaignId: campaign.id,
+          contactId: contact.id,
+          phoneNumber: contact.phoneNumber,
+          position: index + 1,
+        })),
+      );
+      return campaign;
+    });
+  }
+
+  async setDialerCampaignStatus(
+    user: AuthenticatedUser,
+    campaignId: string,
+    input: Record<string, unknown>,
+  ) {
+    if (user.roleKey === ROLES.agent) {
+      throw new ForbiddenException("somente supervisão pode controlar campanhas");
+    }
+    const parsed = campaignStatusSchema.safeParse(input);
+    if (!parsed.success) throw new BadRequestException("status inválido");
+    const now = new Date();
+    return withOrganization(this.db, user.organizationId, async (tx) => {
+      const [campaign] = await tx
+        .update(schema.dialerCampaigns)
+        .set({
+          status: parsed.data.status,
+          startedAt: parsed.data.status === "active" ? now : undefined,
+          completedAt: parsed.data.status === "completed" ? now : null,
+          updatedAt: now,
+        })
+        .where(eq(schema.dialerCampaigns.id, campaignId))
+        .returning();
+      if (!campaign) throw new NotFoundException("campanha não encontrada");
+      return campaign;
+    });
+  }
+
+  async claimNextDialerItem(user: AuthenticatedUser, campaignId: string) {
+    return withOrganization(this.db, user.organizationId, async (tx) => {
+      const [campaign] = await tx
+        .select({ id: schema.dialerCampaigns.id, provider: schema.dialerCampaigns.provider })
+        .from(schema.dialerCampaigns)
+        .where(and(eq(schema.dialerCampaigns.id, campaignId), eq(schema.dialerCampaigns.status, "active")))
+        .limit(1);
+      if (!campaign) throw new BadRequestException("campanha não está ativa");
+
+      const [alreadyAssigned] = await tx
+        .select({ id: schema.dialerCampaignItems.id })
+        .from(schema.dialerCampaignItems)
+        .where(and(
+          eq(schema.dialerCampaignItems.campaignId, campaignId),
+          eq(schema.dialerCampaignItems.assignedUserId, user.userId),
+          eq(schema.dialerCampaignItems.status, "assigned"),
+        ))
+        .limit(1);
+      const candidateId = alreadyAssigned?.id ?? (await tx
+        .select({ id: schema.dialerCampaignItems.id })
+        .from(schema.dialerCampaignItems)
+        .where(and(
+          eq(schema.dialerCampaignItems.campaignId, campaignId),
+          eq(schema.dialerCampaignItems.status, "pending"),
+        ))
+        .orderBy(asc(schema.dialerCampaignItems.position))
+        .limit(1))[0]?.id;
+      if (!candidateId) return { item: null };
+
+      const [claimed] = await tx
+        .update(schema.dialerCampaignItems)
+        .set({
+          assignedUserId: user.userId,
+          status: "assigned",
+          claimedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(schema.dialerCampaignItems.id, candidateId),
+          alreadyAssigned ? eq(schema.dialerCampaignItems.assignedUserId, user.userId) : eq(schema.dialerCampaignItems.status, "pending"),
+        ))
+        .returning();
+      if (!claimed) throw new ConflictException("contato atribuído a outro atendente; tente novamente");
+      const [details] = await tx
+        .select({
+          id: schema.dialerCampaignItems.id,
+          phoneNumber: schema.dialerCampaignItems.phoneNumber,
+          contactId: schema.dialerCampaignItems.contactId,
+          contactName: schema.contacts.name,
+          company: schema.contacts.company,
+        })
+        .from(schema.dialerCampaignItems)
+        .leftJoin(schema.contacts, eq(schema.contacts.id, schema.dialerCampaignItems.contactId))
+        .where(eq(schema.dialerCampaignItems.id, claimed.id))
+        .limit(1);
+      return { item: details ? { ...details, provider: campaign.provider } : null };
+    });
+  }
+
+  async completeDialerItem(
+    user: AuthenticatedUser,
+    itemId: string,
+    input: Record<string, unknown>,
+  ) {
+    const parsed = campaignItemResultSchema.safeParse(input);
+    if (!parsed.success) throw new BadRequestException("resultado inválido");
+    return withOrganization(this.db, user.organizationId, async (tx) => {
+      const where: SQL[] = [eq(schema.dialerCampaignItems.id, itemId)];
+      if (user.roleKey === ROLES.agent) {
+        where.push(eq(schema.dialerCampaignItems.assignedUserId, user.userId));
+      }
+      const [item] = await tx
+        .update(schema.dialerCampaignItems)
+        .set({
+          status: parsed.data.status,
+          disposition: parsed.data.disposition,
+          notes: parsed.data.notes || null,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(and(...where))
+        .returning();
+      if (!item) throw new NotFoundException("item de campanha não encontrado");
+      return item;
+    });
   }
 
   async createCollaborator(
@@ -686,6 +1230,9 @@ export class TelephonyService {
     if (filters.end) callConditions.push(lt(schema.voiceCalls.startedAt, filters.end));
     if (filters.provider) callConditions.push(eq(schema.voiceCalls.provider, filters.provider));
     if (filters.status) callConditions.push(eq(schema.voiceCalls.status, filters.status));
+    if (filters.direction) {
+      callConditions.push(eq(schema.voiceCalls.direction, filters.direction));
+    }
 
     const recordingConditions: SQL[] = [
       eq(schema.callRecordings.organizationId, user.organizationId),
@@ -703,7 +1250,15 @@ export class TelephonyService {
       recordingConditions.push(eq(schema.voiceCalls.provider, filters.provider));
     }
     if (filters.status) {
-      recordingConditions.push(eq(schema.callRecordings.status, filters.status));
+      recordingConditions.push(eq(schema.voiceCalls.status, filters.status));
+    }
+    if (filters.recordingStatus) {
+      recordingConditions.push(
+        eq(schema.callRecordings.status, filters.recordingStatus),
+      );
+    }
+    if (filters.direction) {
+      recordingConditions.push(eq(schema.voiceCalls.direction, filters.direction));
     }
 
     return withOrganization(this.db, user.organizationId, async (tx) => {
@@ -761,6 +1316,41 @@ export class TelephonyService {
         .where(and(...callConditions))
         .orderBy(desc(schema.voiceCalls.startedAt))
         .limit(limit);
+
+      const contactNumbers = [
+        ...new Set(
+          calls.flatMap((call) => {
+            const remoteNumber =
+              call.direction === "inbound" ? call.fromNumber : call.toNumber;
+            if (!remoteNumber) return [];
+            let digits = remoteNumber.replace(/\D/g, "");
+            if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
+            return digits ? [digits] : [];
+          }),
+        ),
+      ];
+      const contactRows = contactNumbers.length
+        ? await tx
+            .select({
+              identifier: schema.contactChannels.identifier,
+              name: schema.contacts.name,
+            })
+            .from(schema.contactChannels)
+            .innerJoin(
+              schema.contacts,
+              eq(schema.contacts.id, schema.contactChannels.contactId),
+            )
+            .where(
+              and(
+                eq(schema.contactChannels.organizationId, user.organizationId),
+                eq(schema.contactChannels.channelType, "phone"),
+                inArray(schema.contactChannels.identifier, contactNumbers),
+              ),
+            )
+        : [];
+      const contactsByNumber = new Map(
+        contactRows.map((contact) => [contact.identifier, contact.name]),
+      );
 
       const recordingRows = await tx
         .select({
@@ -835,7 +1425,29 @@ export class TelephonyService {
           : null,
       }));
 
-      return { team, calls, recordings };
+      const recordingsByCallId = new Map(
+        recordings.map((recording) => [recording.callId, recording]),
+      );
+      const enrichedCalls = calls.map((call) => {
+        const contactNumber =
+          call.direction === "inbound" ? call.fromNumber : call.toNumber;
+        let contactLookupNumber = contactNumber?.replace(/\D/g, "") ?? "";
+        if (
+          contactLookupNumber.length === 10 ||
+          contactLookupNumber.length === 11
+        ) {
+          contactLookupNumber = `55${contactLookupNumber}`;
+        }
+        return {
+          ...call,
+          contactName: contactsByNumber.get(contactLookupNumber) ?? null,
+          contactNumber,
+          ...callTiming(call),
+          recording: recordingsByCallId.get(call.id) ?? null,
+        };
+      });
+
+      return { team, calls: enrichedCalls, recordings };
     });
   }
 
@@ -862,6 +1474,7 @@ export class TelephonyService {
         trunks: [
           { endpoint: "directcall", label: "DirectCall", status: "unknown" },
           { endpoint: "wavoip", label: "WhatsApp", status: "unknown" },
+          { endpoint: "twilio", label: "Twilio", status: "unknown" },
         ],
         endpointStates: {},
         activeChannels: 0,

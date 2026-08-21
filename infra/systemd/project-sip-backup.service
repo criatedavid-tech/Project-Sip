@@ -1,0 +1,15 @@
+[Unit]
+Description=Backup diario do Project SIP
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/home/opc/project-sip
+Environment=BACKUP_ROOT=/var/backups/project-sip
+Environment=BACKUP_RETENTION_DAYS=14
+ExecStart=/home/opc/project-sip/infra/scripts/backup.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { AppHeader } from "@/components/app-header";
 import { useSession } from "@/components/session-provider";
 import { useSipPhone, type VoiceProvider } from "@/components/use-sip-phone";
-import { api, type TelephonyOverview, type TelephonyTeamMember } from "@/lib/api-client";
+import {
+  api,
+  type TelephonyOverview,
+  type TelephonyTeamMember,
+  type WhatsAppVoiceStatus,
+} from "@/lib/api-client";
 import styles from "./telefonia.module.css";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -44,16 +49,23 @@ export default function TelephonyPage() {
   const { session, loading } = useSession();
   const router = useRouter();
   const [overview, setOverview] = useState<TelephonyOverview | null>(null);
+  const [whatsAppVoice, setWhatsAppVoice] =
+    useState<WhatsAppVoiceStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("directcall");
+  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("twilio");
 
   const loadOverview = useCallback(async () => {
     if (!session) return;
     setRefreshing(true);
     try {
-      setOverview(await api.telephonyOverview(session.accessToken));
+      const [telephony, voice] = await Promise.all([
+        api.telephonyOverview(session.accessToken),
+        api.whatsAppVoiceStatus(session.accessToken),
+      ]);
+      setOverview(telephony);
+      setWhatsAppVoice(voice);
       setError(null);
     } catch (loadError) {
       setError(
@@ -66,7 +78,14 @@ export default function TelephonyPage() {
     }
   }, [session]);
 
-  const phone = useSipPhone(session?.accessToken, loadOverview);
+  const myExtension = useMemo(
+    () => overview?.team.find((member) => member.userId === session?.user.id),
+    [overview, session?.user.id],
+  );
+  const phone = useSipPhone(
+    myExtension?.extension ? session?.accessToken : undefined,
+    loadOverview,
+  );
 
   useEffect(() => {
     if (!loading && !session) router.replace("/login");
@@ -79,13 +98,12 @@ export default function TelephonyPage() {
     return () => window.clearInterval(interval);
   }, [loadOverview, session]);
 
-  const myExtension = useMemo(
-    () => overview?.team.find((member) => member.userId === session?.user.id),
-    [overview, session?.user.id],
-  );
-
   const phoneBusy = ["calling", "incoming", "active"].includes(phone.status);
   const phoneOnline = isPhoneOnline(phone.status);
+  const whatsAppTrunk = overview?.asterisk.trunks.find(
+    (trunk) => trunk.endpoint === "wavoip",
+  );
+  const whatsAppUnavailable = whatsAppTrunk?.status === "offline";
   const apiOwnExtensionOnline = myExtension?.endpointStatus === "online";
   const visibleOnlineExtensions = Math.max(
     0,
@@ -185,6 +203,26 @@ export default function TelephonyPage() {
             <strong className={styles.metricValue}>{overview?.summary.recordings ?? 0}</strong>
             <small>{ownScope ? "Somente das suas chamadas" : "Visíveis para supervisão"}</small>
           </article>
+
+          <article className={styles.metricCard}>
+            <span>Voz pelo WhatsApp</span>
+            <strong>
+              {whatsAppVoice?.connected === true
+                ? "Conta conectada"
+                : whatsAppVoice?.connected === false
+                  ? "Conta desconectada"
+                  : whatsAppVoice?.webhookConfigured
+                    ? "Aguardando evento"
+                    : "Monitoramento inativo"}
+            </strong>
+            <small>
+              {whatsAppVoice?.restriction
+                ? "Restrição temporária detectada"
+                : whatsAppVoice?.lastEventAt
+                  ? `Último evento: ${new Date(whatsAppVoice.lastEventAt).toLocaleString("pt-BR")}`
+                  : "Sem evento de dispositivo recebido"}
+            </small>
+          </article>
         </section>
 
         <section className={`${styles.grid} ${ownScope ? styles.singleColumn : ""}`}>
@@ -196,17 +234,17 @@ export default function TelephonyPage() {
               </div>
               <span
                 className={`${styles.status} ${statusClass(
-                  myExtension ? phone.status : "unassigned",
+                  myExtension?.extension ? phone.status : "unassigned",
                 )}`}
               >
-                {statusLabel(myExtension ? phone.status : "unassigned")}
+                {statusLabel(myExtension?.extension ? phone.status : "unassigned")}
               </span>
             </div>
             <div className={styles.extensionValue}>
               {myExtension?.extension ?? "Sem ramal"}
             </div>
             <p className={styles.extensionCaption}>
-              {myExtension
+              {myExtension?.extension
                 ? `Endpoint PJSIP ${myExtension.endpointId}`
                 : "Peça ao administrador para atribuir um ramal."}
             </p>
@@ -215,21 +253,35 @@ export default function TelephonyPage() {
             </label>
             <select
               className={styles.providerSelect}
-              disabled={!myExtension || phoneBusy}
+              disabled={!myExtension?.extension || phoneBusy}
               id="voice-provider"
               value={voiceProvider}
               onChange={(event) => setVoiceProvider(event.target.value as VoiceProvider)}
             >
               <option value="directcall">Telefone — DirectCall</option>
-              <option value="wavoip">WhatsApp — WaVoIP</option>
+              <option disabled={whatsAppUnavailable} value="wavoip">
+                Voz pelo WhatsApp{whatsAppUnavailable ? " — indisponível" : ""}
+              </option>
+              <option value="twilio">Telefone — Twilio (teste: destinos verificados)</option>
             </select>
+            {voiceProvider === "wavoip" ? (
+              <p className={styles.channelDetail}>
+                {whatsAppVoice?.restriction
+                  ? "A conta está temporariamente limitada a contatos conhecidos."
+                  : whatsAppVoice?.connected === true
+                    ? "Conta conectada. A chamada usa o número vinculado ao WhatsApp."
+                    : whatsAppVoice?.webhookConfigured
+                      ? "Canal SIP disponível; aguardando confirmação recente da conta."
+                      : "Canal SIP configurado sem monitoramento de eventos do provedor."}
+              </p>
+            ) : null}
             <label className={styles.phoneLabel} htmlFor="phone-number">
               Número para ligar
             </label>
             <div className={styles.dialRow}>
               <input
                 className={styles.phoneInput}
-                disabled={!myExtension || phoneBusy}
+                disabled={!myExtension?.extension || phoneBusy}
                 id="phone-number"
                 placeholder="(11) 99999-9999"
                 type="tel"
@@ -240,7 +292,10 @@ export default function TelephonyPage() {
                 className={`${styles.callButton} ${
                   phoneAction.destructive ? styles.hangupButton : ""
                 }`}
-                disabled={!phoneActionEnabled}
+                disabled={
+                  !phoneActionEnabled ||
+                  (voiceProvider === "wavoip" && whatsAppUnavailable)
+                }
                 onClick={() => void phoneAction.action()}
                 type="button"
               >
@@ -313,6 +368,10 @@ export default function TelephonyPage() {
         </section>
 
         <section className={styles.shortcuts} aria-label="Atalhos de telefonia">
+          <Link className={styles.shortcutCard} href="/telefonia/discador">
+            <strong>Discador</strong>
+            <span>Teclado, contatos, campanhas e controles da chamada.</span>
+          </Link>
           <Link className={styles.shortcutCard} href="/telefonia/ligacoes">
             <strong>{ownScope ? "Minhas ligações" : "Histórico de ligações"}</strong>
             <span>Filtrar por dia, colaborador, canal e status.</span>

@@ -1,8 +1,22 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDatabase, type Database } from "./client";
 
 const adminUrl = process.env.DATABASE_ADMIN_URL;
+
+describe("contrato das migrações RLS", () => {
+  it("usa o mesmo contexto de tenant configurado por withOrganization", () => {
+    const migration = readFileSync(
+      join(process.cwd(), "migrations", "0010_telephony_dialer.sql"),
+      "utf8",
+    );
+
+    expect(migration).toContain('USING ("organization_id" = current_org_id())');
+    expect(migration).not.toContain("app.current_organization_id");
+  });
+});
 
 /**
  * Tabelas com organization_id que, por decisão explícita, não têm RLS.
@@ -96,12 +110,14 @@ describe.skipIf(!adminUrl)("cobertura de RLS", () => {
           'telephony_extensions',
           'voice_calls',
           'call_recordings',
-          'call_transcriptions'
+          'call_transcriptions',
+          'dialer_campaigns',
+          'dialer_campaign_items'
         )
       group by table_name
     `);
 
-    expect(rows).toHaveLength(8);
+    expect(rows).toHaveLength(10);
     for (const row of rows) {
       expect(row.privileges).toBe("DELETE,INSERT,SELECT,UPDATE");
     }

@@ -8,18 +8,14 @@ import { useSession } from "@/components/session-provider";
 import {
   api,
   type TelephonyCollaborator,
-  type TelephonyDailyAdmin,
 } from "@/lib/api-client";
-import { formatDate, formatDuration, todayInSaoPaulo } from "../telephony-format";
+import { TelephonyMetricsDashboard } from "./telephony-metrics-dashboard";
 import styles from "../telefonia.module.css";
 
 export default function TelephonyAdminPage() {
   const { session, loading } = useSession();
   const router = useRouter();
-  const [date, setDate] = useState(todayInSaoPaulo);
-  const [daily, setDaily] = useState<TelephonyDailyAdmin | null>(null);
   const [collaborators, setCollaborators] = useState<TelephonyCollaborator[]>([]);
-  const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [changingUserId, setChangingUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,13 +36,10 @@ export default function TelephonyAdminPage() {
 
   const loadDaily = useCallback(async () => {
     if (!session || session.user.roleKey !== "admin") return;
-    setRefreshing(true);
     try {
-      const [dailyResult, collaboratorsResult] = await Promise.all([
-        api.telephonyDailyAdmin(session.accessToken, date),
-        api.telephonyCollaborators(session.accessToken),
-      ]);
-      setDaily(dailyResult);
+      const collaboratorsResult = await api.telephonyCollaborators(
+        session.accessToken,
+      );
       setCollaborators(collaboratorsResult.items);
       setError(null);
     } catch (loadError) {
@@ -55,10 +48,8 @@ export default function TelephonyAdminPage() {
           ? loadError.message
           : "Não foi possível carregar o painel administrativo.",
       );
-    } finally {
-      setRefreshing(false);
     }
-  }, [date, session]);
+  }, [session]);
 
   useEffect(() => {
     void loadDaily();
@@ -134,7 +125,7 @@ export default function TelephonyAdminPage() {
             <p className={styles.eyebrow}>Gestão da operação</p>
             <h1>Painel administrativo</h1>
             <p className={styles.subtitle}>
-              Acompanhe o resultado diário de todos os colaboradores e ramais.
+              Acompanhe os indicadores da operação, a equipe e os ramais em um só lugar.
             </p>
           </div>
           <Link className={styles.refresh} href="/telefonia">
@@ -142,22 +133,9 @@ export default function TelephonyAdminPage() {
           </Link>
         </section>
 
-        <section className={styles.filters} aria-label="Período do painel">
-          <label className={styles.filterField}>
-            <span>Dia da operação</span>
-            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-          </label>
-          <button
-            className={styles.refresh}
-            disabled={refreshing}
-            onClick={() => void loadDaily()}
-            type="button"
-          >
-            {refreshing ? "Atualizando..." : "Atualizar"}
-          </button>
-        </section>
-
         {error ? <div className={styles.error}>{error}</div> : null}
+
+        <TelephonyMetricsDashboard accessToken={session.accessToken} />
 
         <section className={styles.managementGrid}>
           <form className={styles.card} onSubmit={createCollaborator}>
@@ -298,96 +276,6 @@ export default function TelephonyAdminPage() {
           </section>
         </section>
 
-        <section className={styles.metrics} aria-label="Resumo do dia">
-          <article className={styles.metricCard}>
-            <span>Colaboradores</span>
-            <strong className={styles.metricValue}>{daily?.summary.teamMembers ?? 0}</strong>
-            <small>Usuários ativos na organização</small>
-          </article>
-          <article className={styles.metricCard}>
-            <span>Ligações</span>
-            <strong className={styles.metricValue}>{daily?.summary.calls ?? 0}</strong>
-            <small>{daily?.summary.completed ?? 0} concluídas</small>
-          </article>
-          <article className={styles.metricCard}>
-            <span>Falhas</span>
-            <strong className={styles.metricValue}>{daily?.summary.failed ?? 0}</strong>
-            <small>Não atendidas, ocupadas ou canceladas</small>
-          </article>
-          <article className={styles.metricCard}>
-            <span>Tempo em chamada</span>
-            <strong className={styles.metricValue}>
-              {formatDuration(daily?.summary.durationSeconds ?? 0)}
-            </strong>
-            <small>Duração total no dia</small>
-          </article>
-          <article className={styles.metricCard}>
-            <span>Gravações</span>
-            <strong className={styles.metricValue}>{daily?.summary.recordings ?? 0}</strong>
-            <small>Arquivos associados às chamadas</small>
-          </article>
-          <article className={styles.metricCard}>
-            <span>Transcrições</span>
-            <strong className={styles.metricValue}>
-              {daily?.summary.transcriptions ?? 0}
-            </strong>
-            <small>Processamentos concluídos</small>
-          </article>
-        </section>
-
-        <section className={styles.card}>
-          <div className={styles.cardHeading}>
-            <div>
-              <h2>Desempenho por colaborador</h2>
-              <p>Consolidado do dia selecionado, incluindo colaboradores sem chamadas.</p>
-            </div>
-            <span className={styles.count}>{daily?.collaborators.length ?? 0}</span>
-          </div>
-          {daily?.collaborators.length ? (
-            <div className={styles.tableWrap}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Colaborador</th>
-                    <th>Ramal</th>
-                    <th>Ligações</th>
-                    <th>Concluídas</th>
-                    <th>Falhas</th>
-                    <th>Tempo total</th>
-                    <th>Média</th>
-                    <th>Gravações</th>
-                    <th>Transcrições</th>
-                    <th>Última ligação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {daily.collaborators.map((collaborator) => (
-                    <tr key={collaborator.userId}>
-                      <td>
-                        <strong>{collaborator.name}</strong>
-                        <small>{collaborator.email}</small>
-                      </td>
-                      <td>{collaborator.extension ?? "—"}</td>
-                      <td>{collaborator.calls}</td>
-                      <td>{collaborator.completed}</td>
-                      <td>{collaborator.failed}</td>
-                      <td>{formatDuration(collaborator.durationSeconds)}</td>
-                      <td>{formatDuration(collaborator.averageDurationSeconds)}</td>
-                      <td>{collaborator.recordings}</td>
-                      <td>{collaborator.transcriptions}</td>
-                      <td>{formatDate(collaborator.lastCallAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className={styles.emptyState}>
-              <strong>Nenhum colaborador ativo</strong>
-              <span>Não há usuários para consolidar neste dia.</span>
-            </div>
-          )}
-        </section>
       </main>
     </div>
   );

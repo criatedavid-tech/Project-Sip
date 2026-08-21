@@ -19,6 +19,7 @@ allow_reload = no
 type = transport
 protocol = ws
 bind = 0.0.0.0
+allow_reload = no
 
 ; Tronco DirectCall. As credenciais entram apenas no container em runtime.
 [directcall-registration]
@@ -108,6 +109,75 @@ direct_media = no
 from_domain = ${WAVOIP_SIP_HOST}
 from_user = ${WAVOIP_SIP_USERNAME}
 callerid = ${WAVOIP_CALLER_ID}
+dtmf_mode = rfc4733
+force_rport = yes
+rewrite_contact = yes
+rtp_symmetric = yes
+
+; Twilio Elastic SIP Trunking usa autenticacao pelo IP publico da VPS.
+; Nao existe registro SIP nem senha quando o IP ACL esta configurado no console.
+[twilio-aor]
+type = aor
+contact = sip:${TWILIO_SIP_DOMAIN}:5060
+qualify_frequency = 30
+
+[twilio]
+type = endpoint
+transport = transport-udp
+context = from-twilio
+disallow = all
+allow = ${TWILIO_SUPPORTED_CODECS}
+aors = twilio-aor
+direct_media = no
+from_domain = ${TWILIO_SIP_DOMAIN}
+from_user = ${TWILIO_CALLER_ID}
+callerid = ${TWILIO_CALLER_ID}
+send_pai = yes
+trust_id_outbound = yes
+dtmf_mode = rfc4733
+force_rport = yes
+rewrite_contact = yes
+rtp_symmetric = yes
+
+; Tronco Nvoip com registro SIP por usuario e senha.
+[nvoip-registration]
+type = registration
+transport = transport-udp
+outbound_auth = nvoip-auth
+server_uri = sip:${NVOIP_SIP_HOST}:${NVOIP_SIP_PORT}
+client_uri = sip:${NVOIP_SIP_USERNAME}@${NVOIP_SIP_HOST}:${NVOIP_SIP_PORT}
+contact_user = ${NVOIP_SIP_USERNAME}
+retry_interval = 60
+forbidden_retry_interval = 300
+expiration = 300
+line = yes
+endpoint = nvoip
+
+[nvoip-auth]
+type = auth
+auth_type = userpass
+username = ${NVOIP_SIP_USERNAME}
+password = ${NVOIP_SIP_PASSWORD}
+
+[nvoip-aor]
+type = aor
+contact = sip:${NVOIP_SIP_HOST}:${NVOIP_SIP_PORT}
+qualify_frequency = 30
+
+[nvoip]
+type = endpoint
+transport = transport-udp
+context = from-nvoip
+disallow = all
+allow = ${NVOIP_SUPPORTED_CODECS}
+outbound_auth = nvoip-auth
+aors = nvoip-aor
+direct_media = no
+from_domain = ${NVOIP_SIP_HOST}
+from_user = ${NVOIP_SIP_USERNAME}
+callerid = ${NVOIP_CALLER_ID}
+send_pai = yes
+trust_id_outbound = yes
 dtmf_mode = rfc4733
 force_rport = yes
 rewrite_contact = yes

@@ -11,12 +11,10 @@ e recebam chamadas por ramais individuais, enquanto supervisores e
 administradores acompanham a operação, escutam gravações e consultam
 transcrições.
 
-Repositório: `criatedavid-tech/Project-Sip`
-
-Diretório local utilizado no desenvolvimento:
+Diretório local esperado para desenvolvimento:
 
 ```text
-C:\Users\Criate\Documents\Codex\omni-platform
+{{diretorio_local}}\omni-platform
 ```
 
 ## 2. Estado atual
@@ -25,11 +23,17 @@ C:\Users\Criate\Documents\Codex\omni-platform
 
 - Autenticação com perfis e permissões.
 - Caixa de entrada para conversas do WhatsApp.
-- Janela de atendimento de 24 horas da Meta.
+- Janela de atendimento de 24 horas da API oficial de mensagens.
 - Painel de telefonia.
+- Discador WebRTC com teclado, DTMF, mudo e espera.
+- Agenda de contatos com clique para ligar.
+- Campanhas de discagem progressiva com distribuição de um contato por vez.
+- Registro de resultado e observações por contato da campanha.
 - Ramais WebRTC individuais no navegador.
-- Ligações telefônicas por tronco SIP da DirectCall.
-- Estrutura SIP para chamadas de voz do WhatsApp via WaVoIP.
+- Ligações telefônicas por troncos SIP configuráveis.
+- Estrutura SIP para chamadas de voz do WhatsApp.
+- Recebimento autenticado e idempotente de eventos de voz pelo WhatsApp.
+- Monitoramento de conexão e restrições temporárias da conta de voz.
 - Histórico de ligações com filtros por dia, colaborador, canal e status.
 - Gravação automática das chamadas atendidas.
 - Reprodução protegida das gravações pela API.
@@ -37,35 +41,56 @@ C:\Users\Criate\Documents\Codex\omni-platform
 - Alternativa de transcrição pela OpenAI.
 - Retentativas automáticas de transcrição.
 - Painel administrativo diário.
+- Dashboard consolidado com período, direção, colaborador, canal e status.
+- Cards de volume, falhas, conclusões e tempos de conversação.
+- Série temporal por hora, dia, semana e mês, separando entrada e saída.
+- Tabela detalhada com reprodução, transcrição e exportação CSV.
 - Cadastro, ativação e desativação de colaboradores.
 - Atribuição automática de ramais.
 - Separação de acesso entre administrador, supervisor e atendente.
 - Isolamento de organizações no PostgreSQL com Row Level Security.
 
-### Validado em ambiente local
+### Validado localmente
 
-- Registro do tronco DirectCall no Asterisk.
-- Registro do ramal WebRTC `1001`.
-- Ligação de saída pela DirectCall.
-- Persistência do histórico de chamadas.
-- Captura de eventos do Asterisk pelo worker de telefonia.
-- Gravação e processamento de transcrição.
+- Autenticação e separação de acesso entre administrador e atendente.
+- Atendente limitado ao próprio ramal, chamadas, gravações e transcrições.
+- Bloqueio HTTP `403` para atendente no dashboard e na gestão de colaboradores.
+- Dashboard administrativo em desktop e viewport móvel de 390 px.
+- Migrações, Row Level Security, lint, typecheck, testes e build completo.
+- Registro dos troncos existentes no Asterisk local.
+- Discagem WebRTC, eventos ARI, persistência, gravação e transcrição local.
+- Dialplan com início, atendimento e encerramento reais da chamada.
+- Webhook de voz com token, deduplicação e roteamento por organização.
 
 ### Pendente ou parcialmente validado
 
-- Recebimento de ligações da DirectCall no ambiente local.
-- Registro atual da conta WaVoIP, que depende de credenciais válidas do
-  dispositivo.
-- Implantação em VPS com IPv4 público.
-- TLS/WSS para uso do telefone WebRTC fora do computador local.
-- Armazenamento definitivo das gravações em objeto S3/MinIO.
-- Política empresarial de retenção e descarte de áudio.
-- Auditoria de cada reprodução ou download de gravação.
+- Fazer novos testes reais de entrada e saída para cada tronco contratado.
+- Configurar uma URL HTTPS temporária para receber eventos externos no ambiente
+  local; nenhum túnel está ativo por padrão.
+- Correlacionar deterministicamente o ID externo da chamada com o ID do Asterisk
+  antes de importar gravações mantidas pelo provedor.
+- Registrar o encerramento do pós-atendimento; enquanto o campo não existir, a
+  interface exibe `Não disponível`.
+- Migrar gravações para armazenamento em objeto e definir retenção e descarte.
+- Implementar auditoria de reprodução/download, backup externo, monitoramento e
+  testes de chamadas simultâneas.
 
-O recebimento da DirectCall não chegou ao Asterisk durante o último teste. O
-tronco estava registrado, mas nenhum pacote SIP de entrada apareceu nos logs.
-O diagnóstico aponta para NAT, ausência de redirecionamento de portas no
-roteador ou roteamento do número de teste pelo provedor.
+Não existe ambiente online ativo. A versão mais avançada e a fonte de verdade
+estão no repositório e no ambiente local. Nenhum deploy em nuvem faz parte do
+fluxo atual.
+
+O histórico da infraestrutura que já foi removida está preservado, apenas para
+auditoria, em [`docs/URGENTES-OPERACAO.md`](docs/URGENTES-OPERACAO.md).
+
+A arquitetura, a operação local e o checklist específico do discador estão em
+[`docs/DISCADOR.md`](docs/DISCADOR.md).
+
+O escopo consolidado do dashboard, do discador, das integrações SIP, das
+validações e das pendências desta entrega está em
+[`docs/ENTREGA-TELEFONIA-2026-08-13.md`](docs/ENTREGA-TELEFONIA-2026-08-13.md).
+
+A configuração e os limites da voz pelo WhatsApp estão em
+[`docs/VOZ-WHATSAPP-LOCAL.md`](docs/VOZ-WHATSAPP-LOCAL.md).
 
 ## 3. Arquitetura
 
@@ -76,9 +101,11 @@ flowchart LR
     W -->|SIP WebRTC| PBX[Asterisk]
     A --> DB[(PostgreSQL)]
     A --> R[(Redis)]
-    A --> M[Meta WhatsApp Cloud API]
-    PBX --> DC[DirectCall SIP]
-    PBX --> WV[WaVoIP SIP]
+    A --> M[API oficial de mensagens]
+    PBX --> PSTN1[Provedor SIP principal]
+    PBX --> PSTN2[Provedor SIP secundário]
+    PBX --> WV[Voz pelo WhatsApp]
+    PBX --> TEST[Provedor SIP de homologação]
     PBX -->|Eventos ARI| TW[Telephony Worker]
     TW --> DB
     TW -->|Arquivo WAV| WH[Whisper local]
@@ -148,7 +175,7 @@ omni-platform/
 ### 6.1 Instalar dependências
 
 ```powershell
-cd C:\Users\Criate\Documents\Codex\omni-platform
+cd {{diretorio_local}}\omni-platform
 pnpm install
 ```
 
@@ -169,9 +196,9 @@ As principais categorias são:
 - MinIO/S3.
 - segredos JWT.
 - Asterisk ARI e WebRTC.
-- DirectCall.
-- WaVoIP.
-- Meta WhatsApp Cloud API.
+- provedores SIP de telefonia.
+- provedor de voz pelo WhatsApp.
+- API oficial de mensagens do WhatsApp.
 - Whisper local ou OpenAI.
 
 ### 6.3 Subir a infraestrutura
@@ -295,7 +322,7 @@ selecionar automaticamente o próximo ramal livre.
 
 1. O usuário autentica seu ramal SIP.js no Asterisk por WebSocket.
 2. O navegador envia a chamada para o Asterisk.
-3. O dialplan seleciona DirectCall ou WaVoIP.
+3. O dialplan seleciona o tronco SIP conforme o canal escolhido.
 4. O Asterisk inicia a gravação quando a chamada é atendida.
 5. Eventos personalizados são enviados pelo ARI.
 6. O worker persiste a chamada e agenda a transcrição.
@@ -310,25 +337,37 @@ selecionar automaticamente o próximo ramal livre.
 
 Para receber chamadas em uma máquina atrás de NAT, normalmente são necessários:
 
-- IPv4 público ou VPS.
+- IPv4 público, túnel compatível ou infraestrutura acessível pelo provedor.
 - UDP `5060` para sinalização SIP.
 - UDP `10000–10099` para RTP.
 - firewall restrito aos IPs do provedor sempre que possível.
 - SIP ALG desabilitado quando causar registro instável ou áudio unilateral.
 
-Sem acesso ao roteador local, a recomendação é hospedar o Asterisk em uma VPS
-com IPv4 público e usar HTTPS/WSS com certificado válido.
+O ambiente atual hospeda o Asterisk somente na máquina local. ICE/STUN, RTP
+simétrico e `rtp_keepalive` estão configurados, mas chamadas recebidas a partir
+da internet dependem de conectividade externa controlada. Redes corporativas
+mais restritivas ainda podem exigir um servidor TURN.
 
 ### 10.4 Provedores
 
-**DirectCall:** telefonia fixa e móvel por tronco SIP. O registro e as ligações
-de saída foram validados no ambiente de teste.
+**Provedor SIP principal:** telefonia fixa e móvel por tronco autenticado. A
+entrada pelo DID ainda precisa de uma nova validação completa no ambiente local.
 
-**WaVoIP:** chamadas de voz do WhatsApp apresentadas ao Asterisk como um segundo
-tronco SIP. É independente da integração de mensagens da Meta.
+**Provedor SIP secundário:** telefonia fixa e móvel por usuário e senha. A rota
+usa o prefixo interno `*7`, removido antes de enviar o número brasileiro no
+formato `55...`. As credenciais ficam exclusivamente no `.env`.
 
-**Meta WhatsApp Cloud API:** mensagens de texto e eventos do WhatsApp Business.
-Não fornece ao Asterisk as chamadas de voz tradicionais do aplicativo.
+**Provedor de voz pelo WhatsApp:** apresenta as chamadas ao Asterisk como outro
+tronco SIP. É independente da integração de mensagens. A API recebe eventos de
+chamada, gravação e dispositivo com token e idempotência, mas não cria chamadas
+sintéticas quando o provedor omite horários ou identificadores correlacionáveis.
+
+**Provedor SIP de homologação:** usa autenticação por lista de IP, destino E.164
+e Caller ID previamente autorizado. O ramal do navegador é preservado antes da
+troca do Caller ID para manter a atribuição correta ao colaborador.
+
+**API oficial de mensagens:** recebe e envia mensagens do WhatsApp Business. A
+integração de mensagens não substitui o tronco usado para chamadas de voz.
 
 ## 11. Gravações e transcrições
 
@@ -384,12 +423,20 @@ uma ação manual de reprocessamento.
 - `GET /telephony/webrtc-config`
 - `GET /telephony/recordings/:id/audio`
 - `POST /telephony/recordings/:id/retry-transcription`
+- `GET /telephony/dialer/contacts`
+- `POST /telephony/dialer/contacts`
+- `GET /telephony/dialer/campaigns`
+- `POST /telephony/dialer/campaigns`
+- `PATCH /telephony/dialer/campaigns/:id/status`
+- `POST /telephony/dialer/campaigns/:id/next`
+- `PATCH /telephony/dialer/items/:id/result`
 
 Filtros disponíveis nas listas: `date`, `userId`, `provider` e `status`.
 
 ### Administração de telefonia
 
 - `GET /telephony/admin/daily`
+- `GET /telephony/admin/dashboard`
 - `GET /telephony/admin/collaborators`
 - `POST /telephony/admin/collaborators`
 - `PATCH /telephony/admin/collaborators/:id/status`
@@ -398,6 +445,8 @@ Filtros disponíveis nas listas: `date`, `userId`, `provider` e `status`.
 
 - `GET /webhooks/whatsapp`
 - `POST /webhooks/whatsapp`
+- `POST /webhooks/whatsapp/voice`
+- `GET /whatsapp/voice/status`
 
 ## 13. Modelo de dados
 
@@ -414,6 +463,8 @@ As principais tabelas são:
 - `voice_calls`: histórico normalizado de chamadas.
 - `call_recordings`: metadados dos áudios.
 - `call_transcriptions`: texto, segmentos e retentativas.
+- `dialer_campaigns`: campanhas, canal, estado e responsável.
+- `dialer_campaign_items`: fila progressiva, atribuição e resultado do contato.
 - `audit_logs`: estrutura de auditoria.
 - `webhook_deliveries`, `event_outbox`: eventos e processamento confiável.
 
@@ -455,7 +506,7 @@ docker compose --env-file .env -f infra/docker-compose.yml exec asterisk asteris
 
 ## 16. Segurança e privacidade
 
-- Nunca versionar `.env`, senhas SIP, chaves da Meta ou segredos JWT.
+- Nunca versionar `.env`, senhas SIP, chaves de provedores ou segredos JWT.
 - Trocar qualquer credencial compartilhada por captura de tela ou mensagem.
 - Utilizar HTTPS e WSS em produção.
 - Restringir ARI, banco, Redis, MinIO e Whisper à rede privada.
@@ -468,22 +519,20 @@ docker compose --env-file .env -f infra/docker-compose.yml exec asterisk asteris
   endereços do provedor.
 - Realizar backup criptografado do banco e das gravações.
 
-## 17. Estratégia recomendada para VPS
+## 17. Estado de operação
 
-1. Criar uma VPS Linux com IPv4 público fixo.
-2. Configurar DNS e certificados TLS.
-3. Subir Asterisk, API, worker, PostgreSQL, Redis, MinIO e Whisper em rede
-   privada de containers.
-4. Expor somente HTTPS/WSS, SIP e o intervalo RTP necessário.
-5. Restringir SIP aos IPs publicados pelos provedores.
-6. Configurar backup externo e retenção.
-7. Monitorar saúde, espaço em disco, filas e falhas de transcrição.
-8. Testar chamadas de entrada, saída, áudio bidirecional e gravação antes de
-   migrar os atendentes.
+O projeto opera somente no ambiente local. Não existe VPS, instância em nuvem,
+domínio de homologação ou aplicação pública ativa associada a esta versão.
 
-Para uma primeira migração, também é possível colocar apenas o Asterisk na VPS
-e manter os demais componentes locais, mas isso aumenta a complexidade de rede.
-Hospedar o conjunto completo costuma ser mais previsível.
+Antes de qualquer futura publicação:
+
+1. Obter autorização explícita do responsável pelo projeto.
+2. Confirmar orçamento, retenção, backup e restauração.
+3. Expor somente HTTPS, SIP restrito e o intervalo RTP indispensável.
+4. Manter API, ARI, PostgreSQL, Redis, storage e transcrição em rede privada.
+5. Trocar todas as credenciais locais e utilizar um gerenciador de segredos.
+6. Testar entrada, saída, áudio, gravação, transcrição e concorrência.
+7. Validar LGPD, consentimento e descarte antes do uso com dados reais.
 
 ## 18. Diagnóstico rápido
 
@@ -530,6 +579,13 @@ Verifique:
 - caminho `ASTERISK_RECORDINGS_PATH`;
 - permissões do volume.
 
+### Chamada do provedor de homologação aparece como `Não atribuída`
+
+Confirme que a rota correspondente salva `CALLERID(num)` em `OMNI_ORIGIN_EXTENSION`
+antes de substituir o Caller ID pelo número verificado. O quinto argumento de
+`record-and-dial` deve usar `OMNI_ORIGIN_EXTENSION`. Depois de atualizar o
+container Asterisk, faça uma nova chamada: o histórico antigo não é alterado.
+
 ### Transcrição falhou
 
 ```powershell
@@ -541,24 +597,23 @@ local. Depois use a ação de tentar novamente na tela de gravações.
 
 ## 19. Próximos passos
 
-1. Implantar o Asterisk ou toda a plataforma em VPS.
-2. Validar chamadas recebidas da DirectCall.
-3. Atualizar e validar as credenciais WaVoIP.
-4. Migrar gravações para MinIO/S3.
-5. Implementar auditoria de reprodução e download.
-6. Definir retenção e consentimento de gravações.
-7. Configurar TLS/WSS e proxy reverso.
-8. Adicionar monitoramento, alertas e backup.
-9. Criar testes end-to-end do navegador e de chamadas.
+1. Configurar o token e testar eventos reais de voz pelo WhatsApp usando um
+   túnel HTTPS temporário e restrito.
+2. Validar entrada e saída reais nos troncos locais configurados.
+3. Registrar o fim do pós-atendimento para calcular `wrap_up_time` e tempo médio
+   de atendimento sem estimativas.
+4. Correlacionar o ID externo da chamada com o ID do Asterisk.
+5. Migrar gravações para armazenamento em objeto.
+6. Implementar auditoria de reprodução, download e exportação.
+7. Definir retenção, consentimento e descarte das gravações.
+8. Adicionar monitoramento, alertas e backup com restauração testada.
+9. Criar testes end-to-end do navegador e de chamadas simultâneas.
 10. Publicar um runbook de recuperação de incidentes.
 
 ## 20. Controle de versão
 
-O último marco funcional antes desta documentação foi registrado no commit:
-
-```text
-7486e9d feat: implementa telefonia SIP, gravacoes e transcricoes
-```
+Os marcos funcionais, correções da telefonia e mudanças operacionais devem ser
+registrados em commits separados para permitir auditoria e reversão segura.
 
 O projeto é atualmente uma aplicação interna. Não há licença pública definida;
 não assuma permissão de redistribuição sem autorização da empresa.

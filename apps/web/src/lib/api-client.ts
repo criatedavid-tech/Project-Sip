@@ -112,6 +112,11 @@ export interface VoiceCall {
   endedAt: string | null;
   durationSeconds: number | null;
   hangupCause: string | null;
+  contactName: string | null;
+  contactNumber: string | null;
+  answerTimeSeconds: number | null;
+  wrapUpTimeSeconds: number | null;
+  recording: CallRecording | null;
 }
 
 export interface CallRecording {
@@ -185,11 +190,24 @@ export interface TelephonyOverview {
   recordings: CallRecording[];
 }
 
+export interface WhatsAppVoiceStatus {
+  webhookConfigured: boolean;
+  connected: boolean | null;
+  deviceStatus: string | null;
+  lastEventAt: string | null;
+  sessionId: number | null;
+  restriction: {
+    type: string;
+    expiresAt: string | null;
+  } | null;
+}
+
 export interface TelephonyFilters {
   date?: string;
   userId?: string;
   provider?: string;
   status?: string;
+  direction?: "inbound" | "outbound";
 }
 
 export interface TelephonyListResponse<T> {
@@ -209,7 +227,7 @@ export interface TelephonyDailyCollaborator
   completed: number;
   failed: number;
   durationSeconds: number;
-  averageDurationSeconds: number;
+  averageDurationSeconds: number | null;
   recordings: number;
   transcriptions: number;
   lastCallAt: string | null;
@@ -227,6 +245,56 @@ export interface TelephonyDailyAdmin {
     transcriptions: number;
   };
   collaborators: TelephonyDailyCollaborator[];
+}
+
+export type DashboardGranularity = "hour" | "day" | "week" | "month";
+
+export interface TelephonyDashboardFilters {
+  startDate: string;
+  endDate: string;
+  direction?: "inbound" | "outbound";
+  userId?: string;
+  provider?: string;
+  status?: string;
+  granularity: DashboardGranularity;
+}
+
+export interface TelephonyDashboardResponse {
+  scope: "organization";
+  filters: {
+    startDate: string;
+    endDate: string;
+    direction: "inbound" | "outbound" | null;
+    userId: string | null;
+    provider: string | null;
+    status: string | null;
+    granularity: DashboardGranularity;
+  };
+  metrics: {
+    averageHandleTimeSeconds: number | null;
+    totalCalls: number;
+    totalConversationSeconds: number;
+    averageConversationSeconds: number | null;
+    completedCalls: number;
+    failedCalls: number;
+  };
+  timeSeries: Array<{
+    key: string;
+    label: string;
+    inbound: number;
+    outbound: number;
+    total: number;
+  }>;
+  team: TelephonyTeamMember[];
+  collaborators: TelephonyDailyCollaborator[];
+  items: VoiceCall[];
+  truncated: boolean;
+  unavailableFields: {
+    attemptStartedAt: boolean;
+    answeredAt: boolean;
+    endedAt: boolean;
+    wrapUpEndedAt: boolean;
+  };
 }
 
 export interface TelephonyCollaborator {
@@ -250,6 +318,44 @@ export interface CreateTelephonyCollaborator {
   password: string;
   roleKey: "agent" | "supervisor";
   extension?: string;
+}
+
+export interface DialerContact {
+  id: string;
+  name: string | null;
+  email: string | null;
+  company: string | null;
+  notes: string | null;
+  phoneNumber: string;
+}
+
+export interface DialerCampaignMetrics {
+  total: number;
+  pending: number;
+  assigned: number;
+  completed: number;
+  failed: number;
+  skipped: number;
+}
+
+export interface DialerCampaign {
+  id: string;
+  name: string;
+  provider: "directcall" | "wavoip" | "twilio";
+  status: "draft" | "active" | "paused" | "completed";
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  metrics: DialerCampaignMetrics;
+}
+
+export interface DialerCampaignItem {
+  id: string;
+  phoneNumber: string;
+  contactId: string | null;
+  contactName: string | null;
+  company: string | null;
+  provider: DialerCampaign["provider"];
 }
 
 export interface WebRtcConfig {
@@ -299,6 +405,10 @@ export const api = {
     return request("/telephony/overview", { headers: auth(accessToken) });
   },
 
+  whatsAppVoiceStatus(accessToken: string): Promise<WhatsAppVoiceStatus> {
+    return request("/whatsapp/voice/status", { headers: auth(accessToken) });
+  },
+
   telephonyCalls(
     accessToken: string,
     filters: TelephonyFilters = {},
@@ -322,6 +432,15 @@ export const api = {
     date: string,
   ): Promise<TelephonyDailyAdmin> {
     return request(`/telephony/admin/daily${queryString({ date })}`, {
+      headers: auth(accessToken),
+    });
+  },
+
+  telephonyAdminDashboard(
+    accessToken: string,
+    filters: TelephonyDashboardFilters,
+  ): Promise<TelephonyDashboardResponse> {
+    return request(`/telephony/admin/dashboard${queryString(filters)}`, {
       headers: auth(accessToken),
     });
   },
@@ -382,6 +501,86 @@ export const api = {
     return request(`/telephony/recordings/${recordingId}/retry-transcription`, {
       method: "POST",
       headers: auth(accessToken),
+    });
+  },
+
+  dialerContacts(accessToken: string): Promise<{ items: DialerContact[] }> {
+    return request("/telephony/dialer/contacts", { headers: auth(accessToken) });
+  },
+
+  createDialerContact(
+    accessToken: string,
+    input: {
+      name: string;
+      phoneNumber: string;
+      email?: string;
+      company?: string;
+      notes?: string;
+    },
+  ): Promise<DialerContact> {
+    return request("/telephony/dialer/contacts", {
+      method: "POST",
+      headers: auth(accessToken),
+      body: JSON.stringify(input),
+    });
+  },
+
+  dialerCampaigns(accessToken: string): Promise<{ items: DialerCampaign[] }> {
+    return request("/telephony/dialer/campaigns", {
+      headers: auth(accessToken),
+    });
+  },
+
+  createDialerCampaign(
+    accessToken: string,
+    input: {
+      name: string;
+      provider: DialerCampaign["provider"];
+      contactIds: string[];
+    },
+  ): Promise<DialerCampaign> {
+    return request("/telephony/dialer/campaigns", {
+      method: "POST",
+      headers: auth(accessToken),
+      body: JSON.stringify(input),
+    });
+  },
+
+  setDialerCampaignStatus(
+    accessToken: string,
+    campaignId: string,
+    status: DialerCampaign["status"],
+  ): Promise<DialerCampaign> {
+    return request(`/telephony/dialer/campaigns/${campaignId}/status`, {
+      method: "PATCH",
+      headers: auth(accessToken),
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  claimNextDialerItem(
+    accessToken: string,
+    campaignId: string,
+  ): Promise<{ item: DialerCampaignItem | null }> {
+    return request(`/telephony/dialer/campaigns/${campaignId}/next`, {
+      method: "POST",
+      headers: auth(accessToken),
+    });
+  },
+
+  completeDialerItem(
+    accessToken: string,
+    itemId: string,
+    input: {
+      status: "completed" | "failed" | "skipped";
+      disposition: string;
+      notes?: string;
+    },
+  ): Promise<unknown> {
+    return request(`/telephony/dialer/items/${itemId}/result`, {
+      method: "PATCH",
+      headers: auth(accessToken),
+      body: JSON.stringify(input),
     });
   },
 

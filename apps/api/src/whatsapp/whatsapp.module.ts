@@ -6,6 +6,9 @@ import { MetaCloudApiProvider } from "./meta-cloud.provider";
 import { WhatsappWebhookController } from "./webhook.controller";
 import { WebhookIngestService } from "./webhook-ingest.service";
 import { InboundMessageService } from "./inbound-message.service";
+import { VoiceWebhookController } from "./voice-webhook.controller";
+import { VoiceWebhookService } from "./voice-webhook.service";
+import { VoiceChannelController } from "./voice-channel.controller";
 
 /**
  * O driver começa em "mock" por padrão: assim nenhum ambiente envia mensagem
@@ -45,8 +48,17 @@ const providerFactory = {
 };
 
 @Module({
-  controllers: [WhatsappWebhookController],
-  providers: [providerFactory, WebhookIngestService, InboundMessageService],
+  controllers: [
+    WhatsappWebhookController,
+    VoiceWebhookController,
+    VoiceChannelController,
+  ],
+  providers: [
+    providerFactory,
+    WebhookIngestService,
+    InboundMessageService,
+    VoiceWebhookService,
+  ],
   exports: [providerFactory, InboundMessageService],
 })
 export class WhatsappModule {}

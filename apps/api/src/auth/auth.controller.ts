@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Post,
   Req,
   Res,
@@ -27,7 +28,7 @@ const REFRESH_COOKIE = "omni_refresh";
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
   // Autenticar não cria recurso: 200, não o 201 que o Nest usa por padrão.
   @Public()
