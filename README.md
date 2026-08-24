@@ -92,6 +92,10 @@ validações e das pendências desta entrega está em
 A configuração e os limites da voz pelo WhatsApp estão em
 [`docs/VOZ-WHATSAPP-LOCAL.md`](docs/VOZ-WHATSAPP-LOCAL.md).
 
+O plano de evolução que mantém as regras de negócio no Omni e limita a
+plataforma telefônica externa a um adaptador substituível está no prompt mestre
+[`docs/PROMPT-EVOLUCAO-INDEPENDENTE-TELEFONIA.md`](docs/PROMPT-EVOLUCAO-INDEPENDENTE-TELEFONIA.md).
+
 ## 3. Arquitetura
 
 ```mermaid
@@ -596,6 +600,10 @@ Confirme modelo, memória disponível, tamanho do áudio e acesso ao endpoint
 local. Depois use a ação de tentar novamente na tela de gravações.
 
 ## 19. Próximos passos
+
+O backlog detalhado, a ordem recomendada de implementação e os critérios de
+validação estão consolidados no
+[`prompt mestre de evolução independente`](docs/PROMPT-EVOLUCAO-INDEPENDENTE-TELEFONIA.md).
 
 1. Configurar o token e testar eventos reais de voz pelo WhatsApp usando um
    túnel HTTPS temporário e restrito.
