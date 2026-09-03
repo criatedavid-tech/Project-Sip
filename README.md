@@ -50,7 +50,12 @@ Diretório local esperado para desenvolvimento:
 - Separação de acesso entre administrador, supervisor e atendente.
 - Isolamento de organizações no PostgreSQL com Row Level Security.
 
-### Validado localmente
+### Validações locais registradas
+
+Referência histórica: entrega de 21/08/2026, cujo código foi registrado no
+commit `2b6b3ed`. Os itens abaixo resumem as verificações daquela entrega, não
+uma confirmação de que serviços ou troncos estejam ativos hoje. Esta revisão
+documental de 03/09/2026 não repetiu os testes funcionais nem as chamadas reais.
 
 - Autenticação e separação de acesso entre administrador e atendente.
 - Atendente limitado ao próprio ramal, chamadas, gravações e transcrições.
@@ -79,8 +84,9 @@ Não existe ambiente online ativo. A versão mais avançada e a fonte de verdade
 estão no repositório e no ambiente local. Nenhum deploy em nuvem faz parte do
 fluxo atual.
 
-O histórico da infraestrutura que já foi removida está preservado, apenas para
-auditoria, em [`docs/URGENTES-OPERACAO.md`](docs/URGENTES-OPERACAO.md).
+As pendências operacionais atuais, os limites dos testes locais e os requisitos
+para uma eventual publicação futura estão em
+[`docs/URGENTES-OPERACAO.md`](docs/URGENTES-OPERACAO.md).
 
 A arquitetura, a operação local e o checklist específico do discador estão em
 [`docs/DISCADOR.md`](docs/DISCADOR.md).
@@ -274,11 +280,13 @@ pnpm dev
 | Rota | Função |
 |---|---|
 | `/login` | Autenticação |
+| `/dashboard` | Tela inicial legada de sessão, identificação e permissões; não é o dashboard de métricas |
 | `/inbox` | Conversas e mensagens do WhatsApp |
 | `/telefonia` | Estado dos troncos, ramal, equipe e discador |
+| `/telefonia/discador` | Discador WebRTC, contatos e campanhas progressivas |
 | `/telefonia/ligacoes` | Histórico filtrado de ligações |
 | `/telefonia/gravacoes` | Áudios e transcrições |
-| `/telefonia/admin` | Gestão diária e colaboradores; somente administrador |
+| `/telefonia/admin` | Dashboard consolidado de métricas, filtros, gráficos, CSV e gestão de colaboradores; somente administrador |
 
 ## 9. Perfis e visibilidade
 
@@ -435,7 +443,17 @@ uma ação manual de reprocessamento.
 - `POST /telephony/dialer/campaigns/:id/next`
 - `PATCH /telephony/dialer/items/:id/result`
 
-Filtros disponíveis nas listas: `date`, `userId`, `provider` e `status`.
+Filtros opcionais de `GET /telephony/calls` e `GET /telephony/recordings`:
+
+- `date`: dia no formato `YYYY-MM-DD`;
+- `userId`: UUID do colaborador;
+- `provider`: identificador do provedor;
+- `status`: estado da chamada em `/calls`, ou da gravação em `/recordings`;
+- `direction`: `inbound` ou `outbound`; omitir para ambas as direções.
+
+O atendente permanece limitado ao próprio usuário mesmo que envie outro
+`userId`. Esses filtros não se aplicam indistintamente aos endpoints de contatos
+e campanhas.
 
 ### Administração de telefonia
 
@@ -444,6 +462,20 @@ Filtros disponíveis nas listas: `date`, `userId`, `provider` e `status`.
 - `GET /telephony/admin/collaborators`
 - `POST /telephony/admin/collaborators`
 - `PATCH /telephony/admin/collaborators/:id/status`
+
+Parâmetros de `GET /telephony/admin/dashboard`:
+
+- `startDate` e `endDate`: obrigatórios, no formato `YYYY-MM-DD`, com ambos os
+  dias incluídos e intervalo máximo de 366 dias;
+- `direction`: opcional, `inbound` ou `outbound`; omitir para ambas;
+- `userId`, `provider` e `status`: filtros opcionais;
+- `granularity`: `hour`, `day`, `week` ou `month`; padrão `day`.
+
+Os limites das datas são interpretados no fuso UTC-03:00. A resposta inclui
+métricas, série temporal e registros filtrados, com limite de 100.000 chamadas
+e indicador `truncated` quando houver mais resultados. O dashboard e sua
+exportação CSV usam esse conjunto limitado; resultados truncados não devem ser
+tratados como o total completo do período.
 
 ### WhatsApp
 
@@ -620,8 +652,38 @@ validação estão consolidados no
 
 ## 20. Controle de versão
 
+O desenvolvimento ocorre diretamente na branch `main`. Quando autorizados,
+commits e pushes são enviados para `origin/main`, sem etapa rotineira de merge
+manual. Antes de começar, confira o estado local e a sincronização com o remoto;
+nunca sobrescreva alterações existentes nem force o push para contornar uma
+divergência.
+
 Os marcos funcionais, correções da telefonia e mudanças operacionais devem ser
 registrados em commits separados para permitir auditoria e reversão segura.
+
+Push atualiza apenas o código e a documentação versionados. Não existe deploy
+configurado nem ambiente online; enviar commits não inicia uma publicação.
+
+### Limites do backup no repositório
+
+O repositório remoto não é um backup completo da instalação local. Ele não
+inclui:
+
+- `.env`, senhas, tokens e outros segredos;
+- conteúdo do banco local, incluindo contatos, chamadas e transcrições;
+- gravações, volumes e arquivos de `infra/.local`;
+- logs, dependências instaladas, caches e artefatos de build;
+- documentos salvos fora do diretório do repositório.
+
+As migrações e o schema estão versionados, mas os dados precisam de um backup
+separado e protegido, com restauração testada. Clonar o repositório não recupera
+o banco, os áudios nem as credenciais.
+
+A retirada da cópia local está planejada para depois da conclusão das
+atualizações. Antes de excluir arquivos ou volumes, confirme que os commits
+estão no remoto e que os dados não versionados foram preservados em destino
+seguro ou tiveram seu descarte expressamente autorizado. O push, por si só,
+não autoriza nem executa essa exclusão.
 
 O projeto é atualmente uma aplicação interna. Não há licença pública definida;
 não assuma permissão de redistribuição sem autorização da empresa.
